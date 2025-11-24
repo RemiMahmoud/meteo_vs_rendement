@@ -1,5 +1,5 @@
 ---
-title: "Read data from Erwan Corlouer PhD"
+title: "Météo vs rendement, introduction"
 format: pdf
 ---
 
@@ -9,7 +9,7 @@ format: pdf
 # Read raw data
 
 
-```{r setup}
+```{r setup, echo = FALSE, message=FALSE, warning=FALSE}
 library(dplyr)
 library(readr)
 library(ggplot2)
@@ -20,6 +20,12 @@ library(tidyr)
 library(openxlsx)
 
 conflicted::conflicts_prefer(dplyr::filter, dplyr::select)
+
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+
+
 ```
 
 
@@ -66,6 +72,13 @@ __Rendu__
 * Si vous avez le temps, et que vous voulez testez des méthodes, voici un ensemble de données climatiques [à télécharger](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=download). Et [les données de rendement](https://doi.pangaea.de/10.1594/PANGAEA.909132) correspondantes.
   
   
-.
+* Faire de la littérature sur la notion de landmark registration. Tester fonction `landmarkreg` du package `fda`.
+
+__Rendu__
+
+* Un document (peu formalisé) sur les différentes méthodes de landmark, avec tests si possible. 
+
+
+
   
 

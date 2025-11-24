@@ -2,7 +2,7 @@
 jours_parcelle1 <- 1:120
 jours_parcelle2 <- 1:120
 
-# NDVI simulé (croissance puis plateau puis déclin)
+# NDVI simulé
 ndvi_parcelle1 <- c(
   seq(0.1, 0.9, length.out=40),  # croissance
   rep(0.9, 40),                  # plateau
@@ -28,16 +28,13 @@ library(ggplot2)
 timeline_ref <- c(0, 0.5, 1)
 
 align_with_landmarks <- function(jours, valeurs, stades_jours, timeline_ref, n_points=200) {
-  # Crée la timeline recalée
   timeline_aligned <- seq(0, 1, length.out = n_points)
   
-  # Fonction de mapping : des dates des stades vers timeline_ref
   map_fun <- approxfun(stades_jours, timeline_ref, rule=2)
   
   # Pour chaque point original, on calcule son temps recalé
   recal_time <- map_fun(jours)
   
-  # print("ok")
   # Interpoler la variable sur la timeline recalée
   approx(x = recal_time, y = valeurs, xout = timeline_aligned, rule=2)$y
 }
