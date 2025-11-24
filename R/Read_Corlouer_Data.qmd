@@ -1,0 +1,71 @@
+---
+title: "Read data from Erwan Corlouer PhD"
+format: pdf
+---
+
+
+
+
+# Read raw data
+
+
+```{r setup}
+library(dplyr)
+library(readr)
+library(ggplot2)
+theme_set(theme_bw())
+library(tidyr)
+
+
+library(openxlsx)
+
+conflicted::conflicts_prefer(dplyr::filter, dplyr::select)
+```
+
+
+```{r}
+
+
+
+
+data_environments <- as_tibble(read.xlsx(xlsxFile = "data/climate_data/corlouer_supp_data.xlsx", fillMergedCells = TRUE, colNames = TRUE,startRow = 4, rows = c(4:51), na.strings = "-"))
+
+
+
+data_climate_aggregated <-  as_tibble(read.xlsx(xlsxFile = "data/climate_data/corlouer_supp_data.xlsx", fillMergedCells = TRUE, colNames = TRUE,startRow = 4, rows = c(4:83), sheet = "Supp Data 3"))
+
+
+```
+
+
+
+# A faire sur ces premiers jours
+
+
+## Prendre en main la problématique
+
+* Lire les chapitres II et IV de la thèse de Erwan Corlouer.
+* Explorer les donnnées aggrégées: présence d'outliers ? Des individus aberrants ? Réaliser description des données en votre disposition (effectifs, équilibre, covariables etc.)
+* Lire l'article de Mathilde Chen voir ce qui se fait dans la littérature
+* Réaliser quelques visualisations
+* Noter toutes les questions que je dois poser à Anne Laperche le 28/11
+
+__Rendu__
+
+* Un document avec la description des données et les (potentielles) questions que vous avez
+
+## Prendre en main les méthodes de données fonctionnelles
+
+* Lire les liens suivants:
+  + [intro à la FDA](https://arxiv.org/html/2404.16598v1)
+  + [ACP fonctionnelle](https://towardsdatascience.com/functional-principal-component-analysis-and-functional-data-91d21261ab7f/) et/ou [ce lien](https://onlinelibrary.wiley.com/doi/10.1002/hbm.20074)
+  + [FDA sur R en utilisant refund](https://www.psychoco.org/2020/slides/Reiss.pdf)
+  + [FDA sur R en utilisant fda](https://rviews.rstudio.com/2021/05/04/functional-data-analysis-in-r/)
+  
+
+* Si vous avez le temps, et que vous voulez testez des méthodes, voici un ensemble de données climatiques [à télécharger](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=download). Et [les données de rendement](https://doi.pangaea.de/10.1594/PANGAEA.909132) correspondantes.
+  
+  
+.
+  
+
