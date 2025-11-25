@@ -3,11 +3,7 @@ title: "Météo vs rendement, introduction"
 format: pdf
 ---
 
-
-
-
 # Read raw data
-
 
 ```{r setup, echo = FALSE, message=FALSE, warning=FALSE}
 library(dplyr)
@@ -28,7 +24,6 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 
 ```
 
-
 ```{r}
 
 
@@ -43,42 +38,33 @@ data_climate_aggregated <-  as_tibble(read.xlsx(xlsxFile = "data/climate_data/co
 
 ```
 
-
-
 # A faire sur ces premiers jours
-
 
 ## Prendre en main la problématique
 
-* Lire les chapitres II et IV de la thèse de Erwan Corlouer.
-* Explorer les donnnées aggrégées: présence d'outliers ? Des individus aberrants ? Réaliser description des données en votre disposition (effectifs, équilibre, covariables etc.)
-* Lire l'article de Mathilde Chen voir ce qui se fait dans la littérature
-* Réaliser quelques visualisations
-* Noter toutes les questions que je dois poser à Anne Laperche le 28/11
+-   Lire les chapitres II et IV de la thèse de Erwan Corlouer.
+-   Explorer les donnnées aggrégées: présence d'outliers ? Des individus aberrants ? Réaliser description des données en votre disposition (effectifs, équilibre, covariables etc.)
+-   Lire l'article de Mathilde Chen voir ce qui se fait dans la littérature
+-   Réaliser quelques visualisations
+-   Noter toutes les questions que je dois poser à Anne Laperche le 28/11
 
-__Rendu__
+**Rendu**
 
-* Un document avec la description des données et les (potentielles) questions que vous avez
+-   Un document avec la description des données et les (potentielles) questions que vous avez
 
 ## Prendre en main les méthodes de données fonctionnelles
 
-* Lire les liens suivants:
-  + [intro à la FDA](https://arxiv.org/html/2404.16598v1)
-  + [ACP fonctionnelle](https://towardsdatascience.com/functional-principal-component-analysis-and-functional-data-91d21261ab7f/) et/ou [ce lien](https://onlinelibrary.wiley.com/doi/10.1002/hbm.20074)
-  + [FDA sur R en utilisant refund](https://www.psychoco.org/2020/slides/Reiss.pdf)
-  + [FDA sur R en utilisant fda](https://rviews.rstudio.com/2021/05/04/functional-data-analysis-in-r/)
-  
+-   Lire les liens suivants:
 
-* Si vous avez le temps, et que vous voulez testez des méthodes, voici un ensemble de données climatiques [à télécharger](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=download). Et [les données de rendement](https://doi.pangaea.de/10.1594/PANGAEA.909132) correspondantes.
-  
-  
-* Faire de la littérature sur la notion de landmark registration. Tester fonction `landmarkreg` du package `fda`.
+    -   [intro à la FDA](https://arxiv.org/html/2404.16598v1)
+    -   [ACP fonctionnelle](https://towardsdatascience.com/functional-principal-component-analysis-and-functional-data-91d21261ab7f/) et/ou [ce lien](https://onlinelibrary.wiley.com/doi/10.1002/hbm.20074)
+    -   [FDA sur R en utilisant refund](https://www.psychoco.org/2020/slides/Reiss.pdf)
+    -   [FDA sur R en utilisant fda](https://rviews.rstudio.com/2021/05/04/functional-data-analysis-in-r/)
 
-__Rendu__
+-   Si vous avez le temps, et que vous voulez testez des méthodes, voici un ensemble de données climatiques [à télécharger](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=download). Et [les données de rendement](https://doi.pangaea.de/10.1594/PANGAEA.909132) correspondantes.
 
-* Un document (peu formalisé) sur les différentes méthodes de landmark, avec tests si possible. 
+-   Faire de la littérature sur la notion de landmark registration. Tester fonction `landmarkreg` du package `fda`.
 
+**Rendu**
 
-
-  
-
+-   Un document (peu formalisé) sur les différentes méthodes de landmark, avec tests si possible.
