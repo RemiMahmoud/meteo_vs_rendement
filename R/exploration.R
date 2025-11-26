@@ -178,14 +178,52 @@ PCA(data_acp)
 
 PCA(data_acp[ , c("VERN", "TMAX_FLO", "HT_P600", "SSR_P600")])
 
+
+
+mod.pca = PCA(data_acp)
+
+
+library(factoextra)
+fviz_pca_var(mod.pca, select.var = list(cos2 = 5))
+
+
+library(Factoshiny)
+
+Factoshiny(data_acp)
 # minin clustering des var et des pacerelles
 
 
 
 
 
-#####
+#####   PLS
 
+require(leaps)             # For variable selection
+require(glmnet)            # For penalized regression procedures
+require(fields)            # For image.plot
+require(pls)               # For cvsegments, plsr, ...
+require(MASS)              # For LDA
+require(viridis)           # For nice colors
 
+data_climate_aggregated_small <- data_climate_aggregated[, -c(1:4)]
+
+str(data_climate_aggregated_small)
+
+n = nrow(data_climate_aggregated_small)
+cvpred = rep(0,n)
+
+segs = cvsegments(n,10)
+cvpred = rep(0,n)
+
+lmp.pls = plsr(ind.name~.,data=data_climate_aggregated_small,ncomp=1,scale=TRUE)
+
+for (k in 1:10) {
+  cvmod = plsr(ind.name~.,data=data_climate_aggregated_small[-segs[[k]],],ncomp=30,scale=TRUE,validation="CV",segments=10)
+  bestncomp = selectNcomp(lmp.pls,method="onesigma")
+  cvpred[segs[[k]]] = predict(cvmod,newdata=data_climate_aggregated_small[segs[[k]],])[,,bestncomp]
+  print(k)
+}
+
+PRESS.pls = sum((data_climate_aggregated_small$ind.name-cvpred)^2) ; PRESS.pls
 
 
