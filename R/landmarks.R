@@ -28,7 +28,7 @@ for (i in 1:n_curves) {
 
 # Visualisation des courbes originales
 fda::matplot(t, curves, type = 'l', lty = 1, col = 1:n_curves, lwd = 2,
-        main = "Courbes originales (désalignées)", xlab = "Temps", ylab = "Valeur")
+             main = "Courbes originales (désalignées)", xlab = "Temps", ylab = "Valeur")
 legend("topright", legend = paste("Courbe", 1:n_curves), col = 1:n_curves, lty = 1, lwd = 2)
 
 
@@ -145,7 +145,7 @@ for (i in 1:n_curves) {
 
 # Visualisation des courbes originales
 fda::matplot(t, curves, type = 'l', lty = 1, col = 1:n_curves, lwd = 2,
-        main = "Courbes originales (désalignées)", xlab = "Temps", ylab = "Valeur")
+             main = "Courbes originales (désalignées)", xlab = "Temps", ylab = "Valeur")
 legend("topright", legend = paste("Courbe", 1:n_curves), col = 1:n_curves, lty = 1, lwd = 2)
 
 
