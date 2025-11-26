@@ -1,15 +1,32 @@
 library(tidyverse)
-
-data_environments <- as_tibble(read.xlsx(xlsxFile = "data/climate_data/corlouer_supp_data.xlsx", fillMergedCells = TRUE, colNames = TRUE,startRow = 4, rows = c(4:51), na.strings = "-"))
-
+library(openxlsx)
 
 
-data_climate_aggregated <-  as_tibble(read.xlsx(xlsxFile = "data/climate_data/corlouer_supp_data.xlsx", fillMergedCells = TRUE, colNames = TRUE,startRow = 4, rows = c(4:83), sheet = "Supp Data 3"))
+data_environments <- as_tibble(
+  read.xlsx(xlsxFile = "data/climate_data/corlouer_supp_data.xlsx",
+            fillMergedCells = TRUE, colNames = TRUE,startRow = 4,
+            rows = c(4:51), na.strings = "-")) |> 
+  rename("Year" = "Year(a)",
+         "Location" = "Location(b)", 
+         "Environment.name" = "Environment.name(c)",
+         "Nitrogen" = "Nitrogen(d)",
+         "Population" = "Population(e)",
+         "MET" = "MET(f)",
+         "Seed.yield" = "Seed.yield(g)",
+         "NNI." = "NNI.(h)",         
+         "Envirotype." = "Envirotype.(i)")
+
+
+
+data_climate_aggregated <-  as_tibble(
+  read.xlsx(xlsxFile = "data/climate_data/corlouer_supp_data.xlsx",
+            fillMergedCells = TRUE, colNames = TRUE,startRow = 4,
+            rows = c(4:83), sheet = "Supp Data 3"))
 
 
 
 ggplot(data_environments) +
-  geom_point(aes(x = `Year(a)`, y = `Seed.yield(g)`, colour = `NNI.(h)`))
+  geom_point(aes(x = `Year`, y = `Seed.yield`, colour = `NNI.`))
 
 data <-  read.xlsx(xlsxFile = "data/climate_data/SuppData.xlsx", fillMergedCells = TRUE, colNames = TRUE)
 
@@ -66,7 +83,7 @@ ggplot(df_ratios, aes(x = reorder(variable, ratio),
   coord_flip() +
   labs(
     x = "Variable climatique",
-    y = "Ratio (pente / sd)",
+    y = "Ratio (pente *sd(x)/ sd(y))",
     fill = "|ratio|",
     title = "Importance relative des variables climatiques"
   ) +
@@ -110,13 +127,64 @@ ggplot(df_R2, aes(x = reorder(variable, R2), y = R2, fill = R2)) +
 ################################################################################
 
 
+data_climate_aggregated$ind.name <- sub("_.*", "", data_climate_aggregated$Indicator.name)
+
+data_climate_aggregated_pivot <- data_climate_aggregated |> 
+  pivot_longer(cols = 5:51, names_to = "Environment.name")
+
+table(data_climate_aggregated_pivot$Period, data_climate_aggregated_pivot$ind.name)  
+# présente pour toutes les saisons (sauf NA)
+# LSR, SSR, TMAX, TMIN, TMN, WSC, HT
+
+data_climate_aggregated_pivot_propre <- data_climate_aggregated_pivot |> 
+  extract(
+    col = Environment.name, 
+    into = c("lieux", "annee", "nitro"),
+    regex = "^([A-Za-z]{2,3})([0-9]{2})_(N\\+|N-)$",
+    remove = FALSE
+  ) |> 
+  left_join(data_environments)
+
+var <- "TMIN"
+
+data_climate_aggregated_pivot_propre |> 
+  filter(ind.name == var) |> 
+  filter(nitro == "N-") |> 
+  mutate(Period = factor(Period, levels = unique(Period))) |> 
+  ggplot() +
+  aes(x = Period, y = value,
+      color = Seed.yield, alpha = 0.8,
+      shape = nitro,
+      group = Environment.name
+      ) +        
+  geom_line() +                      
+  geom_jitter(aes(size = Seed.yield), width = 0.1, height = 0, alpha = 0.8) +
+  scale_color_gradient(low = "lightgreen", high = "darkgreen") +
+  labs(y = var)
+
+
+
+
+###################################   ACP
+
+library(FactoMineR)
+data_acp <- data_climate_aggregated[, -c(1, 2, 4)] |> 
+  column_to_rownames("Indicator.name") |> 
+  select(-ind.name) |> 
+  t() |> 
+  as.data.frame()
+
+PCA(data_acp)
+
+PCA(data_acp[ , c("VERN", "TMAX_FLO", "HT_P600", "SSR_P600")])
+
+# minin clustering des var et des pacerelles
 
 
 
 
 
-
-
+#####
 
 
 
