@@ -168,9 +168,8 @@ data_climate_aggregated_pivot_propre |>
 ###################################   ACP
 
 library(FactoMineR)
-data_acp <- data_climate_aggregated[, -c(1, 2, 4)] |> 
-  column_to_rownames("Indicator.name") |> 
-  select(-ind.name) |> 
+data_acp <- data_climate_aggregated[, -c(1, 2, 3, 4)] |> 
+  column_to_rownames("ind.name") |> 
   t() |> 
   as.data.frame()
 

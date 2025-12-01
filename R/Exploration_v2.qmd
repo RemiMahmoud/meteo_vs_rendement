@@ -1,0 +1,133 @@
+---
+title: "Exploration_v2"
+format: html
+---
+
+
+## Library
+```{r}
+library(openxlsx)
+library(tidyverse)
+library(FactoMineR)
+library(Factoshiny)
+```
+
+
+
+## Création du jeu de donnée
+```{r}
+
+data_environments <- as_tibble(
+  read.xlsx(xlsxFile = "data/climate_data/corlouer_supp_data.xlsx",
+            fillMergedCells = TRUE, colNames = TRUE,startRow = 4,
+            rows = c(4:51), na.strings = "-")) |> 
+  rename("Year" = "Year(a)",
+         "Location" = "Location(b)", 
+         "Environment.name" = "Environment.name(c)",
+         "Nitrogen" = "Nitrogen(d)",
+         "Population" = "Population(e)",
+         "MET" = "MET(f)",
+         "Seed.yield" = "Seed.yield(g)",
+         "NNI." = "NNI.(h)",         
+         "Envirotype." = "Envirotype.(i)")
+data_environments[40, 5] <- "Cv18_N-"
+
+
+data_climate_aggregated <-  as_tibble(
+  read.xlsx(xlsxFile = "data/climate_data/corlouer_supp_data.xlsx",
+            fillMergedCells = TRUE, colNames = TRUE,startRow = 4,
+            rows = c(4:83), sheet = "Supp Data 3"))
+
+data_climate_aggregated$ind.name <- sub("_.*", "", data_climate_aggregated$Indicator.name)
+
+data_climate_aggregated_mat <- t(data_climate_aggregated) |> 
+  as.data.frame() |> 
+  rownames_to_column()
+
+colnames(data_climate_aggregated_mat) <- data_climate_aggregated_mat[3, ]
+data_climate_aggregated_mat <- data_climate_aggregated_mat[-c(1:4), ] |> 
+  rename("Environment.name" = "Indicator.name") |> 
+  filter(Environment.name != "ind.name")
+
+dta <- data_environments |> 
+  left_join(data_climate_aggregated_mat) |> 
+  mutate(across(12:90, ~ as.numeric(as.character(.))))
+
+data_climate_aggregated <- data_climate_aggregated |> 
+  mutate(ind.cla = substr(Indicator.class, 1, 2),
+         per = sub(".*_", "", data_climate_aggregated$Indicator.name))
+data_climate_aggregated[1:10, "per"] <- "NA"
+
+rm(data_climate_aggregated_mat)
+
+```
+
+
+## ACP
+```{r}
+
+#Factoshiny(dta[, 12:90])
+res.PCA<-PCA(dta[, 12:90],graph=FALSE)
+
+plot.PCA(res.PCA,axes=c(1, 2),choix='var',habillage = 'cos2',select='contrib  5',unselect=0,title="Graphe des variables de l'ACP")
+plot.PCA(res.PCA,axes=c(1, 2),title="Graphe des individus de l'ACP")
+
+plot.PCA(res.PCA,axes=c(3,4),choix='var',habillage = 'cos2',select='contrib  5',unselect=0,title="Graphe des variables de l'ACP")
+plot.PCA(res.PCA,axes=c(3,4),title="Graphe des individus de l'ACP")
+
+```
+
+
+```{r}
+
+
+hmfa <- FactoMineR::HMFA(dta[, 12:90], H = list(c(1, 9, 7, 3, 2, 6, 1, 2, 1, 6, 1, 2, 6, 2, 3, 5, 2, 2, 4, 3, 2, 4, 3, 2), c(2, 3, 4, 3, 3, 3, 3, 3)))
+
+var_sup <- scale(dta$Seed.yield)
+loadings <- hmfa$quanti.var$coord
+coord_sup <- t(var_sup) %*% hmfa$ind$coord / nrow(dta)
+cor_sup <- cor(var_sup, hmfa$ind$coord)
+cor_sup
+coord_sup
+plot(hmfa, choix = "var")
+
+group_names_level1 <- paste(
+  data_climate_aggregated$Period,
+  data_climate_aggregated$Indicator.name,
+  sep = " – "
+)
+names(hmfa$group$level1$group.names) <- group_names_level1
+
+
+arrows(0, 0, cor_sup[1], cor_sup[2], col = "blue", lwd = 2)
+text(cor_sup[1], cor_sup[2], labels = "Seed.yield", col = "blue", pos = 3)
+
+```
+
+
+
+```{r}
+
+data(wine)
+hierar <- list(c(2,5,3,10,9,2), c(4,2))
+res.hmfa <- HMFA(wine, H = hierar, type=c("n",rep("s",5)))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
