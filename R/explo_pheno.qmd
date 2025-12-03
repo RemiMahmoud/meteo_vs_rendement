@@ -1,0 +1,99 @@
+---
+title: "explo_pheno"
+format: html
+---
+
+```{r}
+dta_pheno_SSP <- read.csv2("data/pheno_data/Pheno_SSP_103G.csv", sep = ",")
+dta_pheno_V10 <- read.csv2("data/pheno_data/Phenotypes_V10_173_ordered.csv", sep = ",")
+
+dta_pheno_SSP[, -1] <- lapply(dta_pheno_SSP[, -1], as.numeric)
+dta_pheno_V10[, -1] <- lapply(dta_pheno_V10[, -1], as.numeric)
+
+summary(dta_pheno_SSP)
+summary(dta_pheno_V10)
+```
+
+
+
+MFA de dta pheno
+
+
+explication de chaque type de var (Qte, P, Qte_tx)
+
+```{r}
+
+
+mfa_pheno_SSP <- FactoMineR::MFA(
+  dta_pheno_SSP[, 2:8], 
+  group = c(2, 1, 2, 2))
+
+dta_pheno_SSP$P12S/dta_pheno_SSP$P2S - dta_pheno_SSP$Ratio  # ratio est le ratio entre P12S et P2S
+
+ind <- which((dta_pheno_SSP$Qte_12S/dta_pheno_SSP$Qte_tx_12S - dta_pheno_SSP$Qte_2S/dta_pheno_SSP$Qte_tx_2S > 0.01) == TRUE)
+ind
+dta_pheno_SSP$variety[ind]
+
+```
+
+explication de chaque type de var (Qte, P, Qte_tx)
+
+
+```{r}
+
+dta_pheno_SSP_inv <- dta_pheno_SSP |> 
+  select("Qte_12S", "P12S", "Qte_tx_12S", "Qte_2S", "P2S", "Qte_tx_2S")
+
+mfa_pheno_SSP_inv <- FactoMineR::MFA(
+  dta_pheno_SSP_inv[, 1:6], 
+  group = c(3, 3))
+
+
+
+```
+
+
+# dta_pheno_V10
+
+## xx_
+
+SY	Seed Yield → rendement en graines ou grains
+
+SN	Spike Number → nombre d’épis par plante ou par unité de surface
+
+TSW	Thousand Seed Weight → poids de 1000 graines, indicateur de taille/poids des grains
+
+## _xx 
+
+MT moyenne totale
+
+Ei Mesure sur le site i
+
+
+## _xxx11
+
+site et année 
+
+## _n1
+
+répétition
+
+
+
+MFA de dta pheno ord
+```{r}
+
+group_names_level1 <- unique(paste(rep(c("MT", "E"), 3),
+                            c(rep("SY", 5),rep("SN", 5),rep("TSW", 5)),
+                            sep = " – "))
+
+hmfa_pheno_V10 <- FactoMineR::HMFA(
+  dta_pheno_V10[, 2:16], 
+  H = list(c(1, 4, 1, 4, 1, 4), 
+           c(2, 2, 2)),
+  name.group = list(group_names_level1, c("SY", "SN", "TSW"))
+)
+
+```
+
+

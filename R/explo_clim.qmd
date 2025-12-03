@@ -1,0 +1,16 @@
+---
+title: "explo_clim"
+format: html
+---
+
+
+# Indicateur Pedo
+
+```{r}
+data_environments <- as_tibble(
+  read.xlsx(xlsxFile = "data/climate_data/indicateurs_pedologiques/191021_Indicators_Dev_Meta_Network.xlsx",
+            fillMergedCells = TRUE, colNames = TRUE,startRow = 4,na.strings = "-"))
+
+
+```
+
