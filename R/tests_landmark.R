@@ -74,3 +74,154 @@ ggplot(df_plot, aes(Timeline, NDVI, color=Parcelle)) +
        x="Timeline phénologique recalée",
        y="NDVI") +
   theme_minimal()
+
+
+
+
+
+
+
+
+library(SimilarityMeasures)
+y = 1
+x <- seq(0, 3, 0.1)
+s1 <- sin(x)
+s2 <- sin(x + y)
+path1 <- matrix(s1, 31)
+path2 <- matrix(s2, 31)
+DTW(path1, path2, 10)
+
+plot(x, s1, type="l", col="blue", lwd=2,
+     main="Sinus et Sinus décalé",
+     ylab="Valeur", xlab="x")
+lines(x, s2, col="red", lwd=2)
+legend("topright", legend=c("s1 = sin(x)", "s2 = sin(x+0.3)"),
+       col=c("blue","red"), lwd=2)
+
+
+
+
+
+
+
+library(dtw)
+demo(dtw)
+
+?dtw
+?plot.dtw
+
+n = 20
+
+idx<-seq(0,6.28,len=n);
+query<-sin(idx)+runif(n)/10;
+
+plot(x = 1:n, y = query)
+
+## A cosine is for template; sin and cos are offset by 25 samples
+template<-cos(idx)
+
+## Find the best match with the canonical recursion formula
+library(dtw);
+alignment<-dtw(query,template,keep=TRUE);
+
+## Display the warping curve, i.e. the alignment curve
+plot(alignment,type="threeway")
+
+## Align and plot with the Rabiner-Juang type VI-c unsmoothed recursion
+plot(
+  dtw(query,template,keep=TRUE,
+      step=rabinerJuangStepPattern(6,"c")),
+  type="twoway",offset=-2);
+
+## See the recursion relation, as formula and diagram
+rabinerJuangStepPattern(6,"c")
+plot(rabinerJuangStepPattern(6,"c"))
+
+alignment$stepPattern
+
+
+## And much more!
+
+# ca ca fonctionne bien mais ca n'a pas de landmark, possibilité de faire ca 
+# par morceau. Ou alors si on a des fonction qui se ressemble peut etre que ca marche
+
+
+idx<-seq(0,6.28,len=100)
+query<-matrix(c(sin(idx)+runif(100)/10, sin(idx)+runif(100)/10), 2)
+
+plot(x = 1:100, y = query)
+
+## A cosine is for template; sin and cos are offset by 25 samples
+template<-matrix(c(cos(idx), cos(idx)), 2)
+
+## Find the best match with the canonical recursion formula
+library(dtw)
+alignment<-dtw(query,template,keep=TRUE)
+
+## Display the warping curve, i.e. the alignment curve
+plot(alignment,type="threeway")
+
+## Align and plot with the Rabiner-Juang type VI-c unsmoothed recursion
+plot(
+  dtw(query,template,keep=TRUE,
+      step=rabinerJuangStepPattern(6,"c")),
+  type="twoway",offset=-2)
+
+## See the recursion relation, as formula and diagram
+rabinerJuangStepPattern(6,"c")
+plot(rabinerJuangStepPattern(6,"c"))
+
+## And much more!
+
+plot(x = alignment$index2, y = alignment$index1)
+
+
+
+
+
+
+t  <- c(0, 1, 3, 5)
+tp <- c(0, 2, 2.5, 5)
+
+# fonction qui va de t à tp
+f <- splinefun(x = t, y = tp, method = "monoH.FC")
+
+# creation des points de la fonction
+x <- seq(min(t), max(t), length.out = 100)
+values <- f(x)
+
+# plot
+plot(t, tp, col = "red", pch = 19, main = "Spline monotone (Fritsch–Carlson)")
+lines(x, values, col = "blue", lwd = 2)
+
+
+# Fonction inverse
+
+f_inv_num <- function(y) {
+  solve_one <- function(y0) {
+    uniroot(
+      f = function(x) f(x) - y0,
+      interval = c(min(t), max(t)),
+      tol = .Machine$double.eps^0.5
+    )$root
+  }
+  sapply(y, solve_one)
+}
+
+# Test
+vals_inv <- f_inv_num(x)
+
+plot(tp, t, col = "red", pch = 19, main = "Spline monotone (Fritsch–Carlson)")
+lines(x, vals_inv, col = "blue", lwd = 2)
+
+# vérification
+xx1 <- f(vals_inv)
+plot(x, xx1)
+
+xx2 <- f_inv_num(values)
+plot(x, xx2)
+
+
+
+
+
