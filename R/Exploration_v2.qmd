@@ -53,10 +53,14 @@ dta <- data_environments |>
   left_join(data_climate_aggregated_mat) |> 
   mutate(across(12:90, ~ as.numeric(as.character(.))))
 
+data_climate_aggregated[32, 3] <- "VERN_CW"
+data_climate_aggregated[52, 3] <- "QPT_FLO"
+
 data_climate_aggregated <- data_climate_aggregated |> 
   mutate(ind.cla = substr(Indicator.class, 1, 2),
          per = sub(".*_", "", data_climate_aggregated$Indicator.name))
 data_climate_aggregated[1:10, "per"] <- "NA"
+
 
 rm(data_climate_aggregated_mat)
 
@@ -91,13 +95,20 @@ cor_sup
 coord_sup
 plot(hmfa, choix = "var")
 
-group_names_level1 <- paste(
-  data_climate_aggregated$Period,
-  data_climate_aggregated$Indicator.name,
-  sep = " – "
-)
-names(hmfa$group$level1$group.names) <- group_names_level1
 
+group_names_level1 <- unique(paste(data_climate_aggregated$per,
+                            data_climate_aggregated$ind.cla,
+                            sep = " – "))
+group_names_level2 <- unique(data_climate_aggregated$per)
+
+# Dans votre appel HMFA, utilisez le paramètre 'name.group'
+hmfa <- FactoMineR::HMFA(
+  dta[, 12:90], 
+  H = list(c(1, 9, 7, 3, 2, 6, 1, 2, 1, 6, 1, 2, 6, 2, 3, 5, 2, 2, 4, 3, 2, 4, 3, 2), 
+           c(2, 3, 4, 3, 3, 3, 3, 3)),
+  name.group = list(group_names_level1, group_names_level2)
+)
+plot(hmfa, choix = "var")
 
 arrows(0, 0, cor_sup[1], cor_sup[2], col = "blue", lwd = 2)
 text(cor_sup[1], cor_sup[2], labels = "Seed.yield", col = "blue", pos = 3)
