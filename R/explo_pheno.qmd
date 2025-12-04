@@ -16,6 +16,15 @@ summary(dta_pheno_V10)
 
 
 
+
+```{r}
+sub("_.*", "", sub("*._", "", names(dta_pheno_V10)))
+
+
+
+```
+
+
 MFA de dta pheno
 
 
@@ -35,6 +44,7 @@ ind
 dta_pheno_SSP$variety[ind]
 
 ```
+
 
 explication de chaque type de var (Qte, P, Qte_tx)
 
@@ -94,6 +104,15 @@ hmfa_pheno_V10 <- FactoMineR::HMFA(
   name.group = list(group_names_level1, c("SY", "SN", "TSW"))
 )
 
+
+hmfa_pheno_V10 <- FactoMineR::HMFA(
+  dta_pheno_V10[, 2:16], 
+  H = list(c(1, 4, 1, 4, 1, 4), 
+           c(2, 2, 2)),
+  name.group = list(group_names_level1, c("SY", "SN", "TSW"))
+)
+
+PCA(dta_pheno_V10[, 17:70])
 ```
 
 
