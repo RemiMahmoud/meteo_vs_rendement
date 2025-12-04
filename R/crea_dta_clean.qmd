@@ -1,0 +1,57 @@
+---
+title: "crea_dta_clean"
+format: html
+---
+
+Librarie
+```{r}
+library(tidyverse)
+library(readxl)
+
+```
+
+
+Importer les données
+```{r}
+
+ind_dev <- read_excel("data/climate_data/indicateurs_pedologiques/191021_Indicators_Dev_Meta_Network - Version_utilisable.xlsx") |>
+  separate("ENVIRONNEMENT / PARTENAIRE", c('ENVIRONNEMENT', 'PARTENAIRE')) |> 
+  filter(`AZOTE INITIAL LABEL` == "N2") |> 
+  filter(`Probe Genotype` == "Montego")
+
+```
+
+
+Avec meteo 
+- BGA15
+- EUR14
+- TI15
+- LIM15
+- RAGT14
+- SYN15
+- INRA15
+- INRA16
+- RAGT15
+- SYN14
+- MAD14
+- MAD15
+- INRA11
+- INRA12
+- INRA13
+- BGA11
+- TI13
+- INRA17
+- INRA18
+- EUR18BLO
+
+sans meteo
+
+
+Regarder les champs à conserver
+```{r}
+
+
+
+
+```
+
