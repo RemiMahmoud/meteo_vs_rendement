@@ -47,10 +47,35 @@ Avec meteo
 sans meteo
 
 
-Regarder les champs à conserver
+Regarder la météo
 ```{r}
 
+INRA11_LR <- read_excel("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.1_R2011/191118_INRA11_LR_IPC_Calcul_ok.xlsx", 
+    col_names = FALSE) |> 
+  mutate_all(as.character) |> 
+  as.data.frame()
 
+INRA11_LR <- INRA11_LR[-dim(INRA11_LR)[1], ]
+
+
+iT <- which(INRA11_LR[1, ] == "TEMPERATURE")
+iEH <- which(INRA11_LR[1, ] == "ETAT HYDRIQUE")
+iR <- which(INRA11_LR[1, ] == "RAYONNEMENT")
+iF <- length(INRA11_LR[1, ])
+iL <- c(rep("", iT-1), rep("TEMP_", iEH - iT), rep("E.HYD_", iR - iEH), rep("RAYO_", iF - iR), "")
+
+colnames(INRA11_LR) <- as.character(paste0(iL, as.vector(INRA11_LR[4, ])))
+
+INRA11_LR <- INRA11_LR[-c(1:4), ]
+
+INRA11_LR[, 3] <-  as.Date(as.numeric(unlist(INRA11_LR[, 3])), origin = "1899-12-30")
+
+INRA11_LR <- INRA11_LR |> 
+  filter(! is.na(DATE))
+
+rownames(INRA11_LR) <- as.character(as.Date(as.numeric(unlist(INRA11_LR[, 3])), origin = "1899-12-30"))
+
+INRA11_LR <- INRA11_LR[, -c(1:3)]
 
 
 ```
