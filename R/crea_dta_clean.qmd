@@ -23,24 +23,31 @@ ind_dev <- read_excel("data/climate_data/indicateurs_pedologiques/191021_Indicat
 
 
 Avec meteo 
-- BGA15
+- INRA11
+- BGA11
+
+- INRA12
+
+- INRA13
+- TI13
+
 - EUR14
-- TI15
-- LIM15
-- RAGT14
-- SYN15
-- INRA15
-- INRA16
-- RAGT15
 - SYN14
 - MAD14
+- RAGT14
+
+- TI15
+- LIM15
+- SYN15
+- INRA15
+- BGA15
+- RAGT15
 - MAD15
-- INRA11
-- INRA12
-- INRA13
-- BGA11
-- TI13
+
+- INRA16
+
 - INRA17
+
 - INRA18
 - EUR18BLO
 
@@ -49,34 +56,221 @@ sans meteo
 
 Regarder la météo
 ```{r}
+link = "data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.4_R2014/191018_EUR14_IPC_Calcul_ok.xlsx"
+read_meteo <- function(link){
+  data <- read_excel(link, col_names = FALSE) |> 
+    mutate_all(as.character) |> 
+    as.data.frame()
+  
+  
+  data <- data[-dim(data)[1], ]
+  ph <- which(data[4, ] == "Photoperiode")
+  data <- data[, -((ph + 1): dim(data)[2])]
+  
+  iT <- which(data[1, ] == "TEMPERATURE")
+  iEH <- which(data[1, ] == "ETAT HYDRIQUE")
+  iR <- which(data[1, ] == "RAYONNEMENT")
+  iF <- length(data[1, ])
+  iL <- c(rep("", iT-1), rep("TEMP_", iEH - iT), rep("E.HYD_", iR - iEH), rep("RAYO_", iF - iR), "")
+  
+  colnames(data) <- as.character(paste0(iL, as.vector(data[4, ])))
+  
+  data <- data[-c(1:4), ]
+  
+  data <- data[!is.na(data[[7]]), ]
+  
+  data <- data |> 
+    filter(! is.na(DATE))
 
-INRA11_LR <- read_excel("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.1_R2011/191118_INRA11_LR_IPC_Calcul_ok.xlsx", 
-    col_names = FALSE) |> 
-  mutate_all(as.character) |> 
-  as.data.frame()
+  data <- data[, -c(1:2)]  # 2 ->3
+  
+  data <- data |> mutate_all(as.numeric)
+}
 
-INRA11_LR <- INRA11_LR[-dim(INRA11_LR)[1], ]
+```
 
 
-iT <- which(INRA11_LR[1, ] == "TEMPERATURE")
-iEH <- which(INRA11_LR[1, ] == "ETAT HYDRIQUE")
-iR <- which(INRA11_LR[1, ] == "RAYONNEMENT")
-iF <- length(INRA11_LR[1, ])
-iL <- c(rep("", iT-1), rep("TEMP_", iEH - iT), rep("E.HYD_", iR - iEH), rep("RAYO_", iF - iR), "")
 
-colnames(INRA11_LR) <- as.character(paste0(iL, as.vector(INRA11_LR[4, ])))
 
-INRA11_LR <- INRA11_LR[-c(1:4), ]
+```{r}
+INRA11 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.1_R2011/191118_INRA11_LR_IPC_Calcul_ok.xlsx")
+BGA11 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.1_R2011/191119_BGA11_MD11_IPC_Calcul_ok.xlsx")
 
-INRA11_LR[, 3] <-  as.Date(as.numeric(unlist(INRA11_LR[, 3])), origin = "1899-12-30")
+INRA12 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.2_R2012/191118_INRA12_LR_IPC_Calcul_ok.xlsx")
 
-INRA11_LR <- INRA11_LR |> 
-  filter(! is.na(DATE))
+INRA13 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.3_R2013/191118_INRA13_LR_IPC_Calcul_ok.xlsx")
+TI13 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.3_R2013/191119_TI13_DIJ13_IPC_Calcul_ok.xlsx")
 
-rownames(INRA11_LR) <- as.character(as.Date(as.numeric(unlist(INRA11_LR[, 3])), origin = "1899-12-30"))
+EUR14 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.4_R2014/191018_EUR14_IPC_Calcul_ok.xlsx")
+RAGT14 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.4_R2014/191022_RAGT14_IPC_Calcul_ok.xlsx")
+MAD14 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.4_R2014/191106_MAD14_IPC_Calcul_ok.xlsx")
+SYN14 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.4_R2014/191106_SYN14_IPC_Calcul_ok.xlsx")
 
-INRA11_LR <- INRA11_LR[, -c(1:3)]
+
+
+TI15 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.5_R2015/191018_TI15_IPC_Calcul_ok.xlsx")
+LIM15 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.5_R2015/191022_LIM15_IPC_Calcul_ok.xlsx")
+SYN15 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.5_R2015/191022_SYN15_IPC_Calcul_ok.xlsx")
+INRA15 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.5_R2015/191022_INRA15_IPC_Calcul_ok.xlsx")
+BGA15 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.5_R2015/191018_BGA15_IPC_Calcul_ok.xlsx")
+RAGT15 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.5_R2015/191106_RAGT15_IPC_Calcul_ok.xlsx")
+MAD15 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.5_R2015/191106_MAD15_IPC_Calcul_ok.xlsx")
+
+INRA16 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.6_R2016/191025_INRA16_IPC_Calcul_ok.xlsx")
+
+INRA17 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.7_R2017/191114_INRA17_LR_IPC_Calcul_ok.xlsx")
+
+INRA18 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.8_R2018/191118_INRA18_LR_IPC_Calcul_ok.xlsx")
+EUR18 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.8_R2018/191031_EUR18_BLO_IPC_Calcul_ok.xlsx")
+
+dts <- list(
+  INRA11 = INRA11,
+  BGA11 = BGA11,
+  INRA12 = INRA12,
+  INRA13 = INRA13,
+  TI13 = TI13,
+  EUR14 = EUR14,
+  SYN14 = SYN14,
+  MAD14 = MAD14,
+  RAGT14 = RAGT14,
+  TI15 = TI15,
+  LIM15 = LIM15,
+  SYN15 = SYN15,
+  INRA15 = INRA15,
+  BGA15 = BGA15,
+  RAGT15 = RAGT15,
+  MAD15 = MAD15,
+  INRA16 = INRA16
+)
+dt <- imap_dfr(dts, ~ mutate(exp = .y, .x))
+names(dt)
+
+```
+
+
+
+```{r}
+
+INRA11 |>
+  ggplot() +
+  aes(x = DATE, y = TEMP_T_Q) + 
+  geom_point()
 
 
 ```
+
+
+trouver hiver 
+```{r}
+
+lm_hiver <- function(vec_temp, jours_debut = 3, jours_fin = 5){
+  
+  l <- length(vec_temp)
+  
+  ind_d <- rep(1, l-jours_debut+1)
+  
+  for(i in 1:jours_debut){
+    ind_d <- ind_d * (vec_temp[i:(l-jours_debut+i)]<=5)
+  }
+  debut_hiver <- which.min(ind_d == 0)
+  
+  ind_f <- c(rep(0, debut_hiver), rep(1, l-jours_fin+1-debut_hiver))
+  
+  for(i in 1:jours_fin){
+    ind_f <- ind_f * (vec_temp[i:(l-jours_fin+i)]>=5)
+  }
+  fin_hiver <- which.min(ind_f == 0)
+  
+  hiver <- c(debut_hiver, debut_hiver + jours_debut- 1, fin_hiver, fin_hiver + jours_fin - 1)
+  print(hiver)
+  return(hiver)
+}
+
+```
+
+
+```{r}
+
+hiv_INRA11 <- lm_hiver(INRA11$TEMP_T_Q, jours_debut = 3, jours_fin = 5)
+hiv_BGA11 <- lm_hiver(BGA11$TEMP_T_Q, jours_debut = 3, jours_fin = 5)
+
+```
+
+
+fabrique les landsmarks
+```{r}
+
+
+make_lm <- function(data, jours_debut = 3, jours_fin = 5){
+  t0 <- data[1, 1] - 1
+  vec_temp <- data$TEMP_T_Q
+  
+  lm_hiver <- lm_hiver(vec_temp, jours_debut, jours_fin)
+  t0 + c(1, lm_hiver, length(vec_temp))
+}
+
+lm_INRA11 <- make_lm(INRA11)
+lm_BGA11 <- make_lm(BGA11)
+
+```
+
+
+fabriques les references comme la moyennes de landmarks 
+```{r}
+
+make_ref <- function(list_lm){
+  ref <- round(colMeans(do.call(rbind, list_lm)))
+}
+
+ref <- make_ref(list(make_lm(INRA11), make_lm(BGA11)))
+```
+round pertiant ??
+
+
+
+```{r}
+
+make_spline <- function(list_lm, ref = NA){
+  if (is.na(ref)){
+    ref <- make_ref(list_lm)
+  }
+  
+  lapply(list_lm, function(lm) splinefun(x = ref, y = lm, method = "monoH.FC"))
+}
+
+spline <- make_spline(list_lm = list(make_lm(INRA11), make_lm(BGA11)))
+
+```
+
+
+```{r}
+
+dt_temp_INRA11 <- data.frame(date = INRA11$DATE, temp = INRA11$TEMP_T_Q, champ = "INRA11")
+dt_temp_BGA11 <- data.frame(date = BGA11$DATE, temp = BGA11$TEMP_T_Q, champ = "BGA11")
+dt_temp <- rbind(dt_temp_INRA11, dt_temp_BGA11)
+
+ggplot(dt_temp) +
+  aes(x = date, y = temp, col = champ) + 
+  geom_point() +
+  geom_vline(xintercept = lm_INRA11, color = "blue") +
+  geom_vline(xintercept = lm_BGA11, color = "orange")
+
+```
+
+Plot spline
+```{r}
+lm <- c(lm_INRA11, lm_BGA11)
+x <- seq(min(lm), max(lm), length.out = 1000)
+dt_spline <- data.frame(x = x)
+for (i in length(spline)){
+  spline[1](x)
+  
+}
+
+```
+
+
+
+
+
 

@@ -117,20 +117,6 @@ text(cor_sup[1], cor_sup[2], labels = "Seed.yield", col = "blue", pos = 3)
 
 
 
-```{r}
-
-data(wine)
-hierar <- list(c(2,5,3,10,9,2), c(4,2))
-res.hmfa <- HMFA(wine, H = hierar, type=c("n",rep("s",5)))
-
-```
-
-
-
-
-
-
-
 
 
 
