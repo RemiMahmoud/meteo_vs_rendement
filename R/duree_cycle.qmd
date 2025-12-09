@@ -1,0 +1,28 @@
+---
+title: "duree_cycle"
+format: html
+---
+
+```{r}
+library(tidyverse)
+library(readxl)
+
+```
+
+Importer les données
+```{r}
+
+hiver <- read_excel("Climatic_Winter_problème.xlsx") |> 
+  select(1:3) |> 
+  rename("debut" = `date de début en pratique`, 
+         "fin" = `date de fin en pratique`) |> 
+  separate(col = lieuXannee, 
+           into = c("lieux", "annee"), 
+           sep = "(?<=\\D)(?=\\d)") |> 
+  mutate("duree_hiver" = fin - debut)
+
+hiver |> 
+  ggplot(aes(x = annee, y = duree_hiver, colour = lieux)) +
+  geom_point()
+
+```
