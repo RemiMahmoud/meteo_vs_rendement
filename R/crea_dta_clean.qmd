@@ -3,13 +3,12 @@ title: "crea_dta_clean"
 format: html
 ---
 
-Librarie
+Librairies
 ```{r}
 library(tidyverse)
 library(readxl)
 
 ```
-
 
 Importer les données
 ```{r}

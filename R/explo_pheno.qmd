@@ -4,12 +4,11 @@ format: html
 ---
 
 ```{r}
+
 library(tidyr)
 library(dplyr)
 library(stringr)
-```
-
-
+library(FactoMineR)
 ```{r}
 dta_pheno_SSP <- read.csv2("data/pheno_data/Pheno_SSP_103G.csv", sep = ",")
 dta_pheno_V10 <- read.csv2("data/pheno_data/Phenotypes_V10_173_ordered.csv", sep = ",")
@@ -122,7 +121,7 @@ mfa_pheno_SSP_inv <- FactoMineR::MFA(
 
 SY	Seed Yield → rendement en graines ou grains
 
-SN	Spike Number → nombre d’épis par plante ou par unité de surface
+SN	Spike Number → nombre d’épis par plante ou par unité de surface OU Seed Number
 
 TSW	Thousand Seed Weight → poids de 1000 graines, indicateur de taille/poids des grains
 
