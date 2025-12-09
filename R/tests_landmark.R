@@ -221,7 +221,49 @@ plot(x, xx1)
 xx2 <- f_inv_num(values)
 plot(x, xx2)
 
+#########################################################""
+#  calcule phi -1 direct
+
+t <- c(0, 2, 2.5, 5)
+tp  <- c(0, 1, 3, 5)
+
+# fonction qui va de t à tp
+f <- splinefun(x = t, y = tp, method = "monoH.FC")
+
+# creation des points de la fonction
+x <- seq(min(t), max(t), length.out = 100)
+values <- f(x)
+
+# plot
+plot(t, tp, col = "red", pch = 19, main = "Spline monotone (Fritsch–Carlson)")
+lines(x, values, col = "blue", lwd = 2)
 
 
+# Fonction inverse
 
+f_inv_num <- function(y) {
+  solve_one <- function(y0) {
+    uniroot(
+      f = function(x) f(x) - y0,
+      interval = c(min(t), max(t)),
+      tol = .Machine$double.eps^0.5
+    )$root
+  }
+  sapply(y, solve_one)
+}
+
+# Test
+vals_inv <- f_inv_num(x)
+
+plot(tp, t, col = "red", pch = 19, main = "Spline monotone (Fritsch–Carlson)")
+lines(x, vals_inv, col = "blue", lwd = 2)
+
+# vérification
+xx1 <- f(vals_inv)
+plot(x, xx1)
+
+xx2 <- f_inv_num(values)
+plot(x, xx2)
+
+#Pas ouf mieux dans le premier sens
 
