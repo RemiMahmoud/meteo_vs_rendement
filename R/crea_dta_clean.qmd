@@ -117,10 +117,10 @@ MAD15 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.
 
 INRA16 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.6_R2016/191025_INRA16_IPC_Calcul_ok.xlsx")
 
-INRA17 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.7_R2017/191114_INRA17_LR_IPC_Calcul_ok.xlsx")
+INRA17 <- read_xlsx("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.7_R2017/191114_INRA17_LR_IPC_Calcul_ok.xlsx")
 
-INRA18 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.8_R2018/191118_INRA18_LR_IPC_Calcul_ok.xlsx")
-EUR18 <- read_meteo("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.8_R2018/191031_EUR18_BLO_IPC_Calcul_ok.xlsx")
+INRA18 <- read_xlsx("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.8_R2018/191118_INRA18_LR_IPC_Calcul_ok.xlsx")
+EUR18 <- read_xlsx("data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.8_R2018/191031_EUR18_BLO_IPC_Calcul_ok.xlsx")
 
 dts <- list(
   INRA11 = INRA11,
