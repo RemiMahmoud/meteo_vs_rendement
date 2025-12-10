@@ -4,10 +4,13 @@ format: html
 ---
 
 ```{r}
+
 library(tidyr)
 library(dplyr)
 library(stringr)
+library(FactoMineR)
 ```
+
 
 
 ```{r}
@@ -25,33 +28,19 @@ summary(dta_pheno_V10)
 Montego
 ```{r}
 
-aviso_rendment <- dta_pheno_V10 |> 
+montego_rendment <- dta_pheno_V10 |> 
   filter(variety == "BRA_008_Aviso") |> 
   select(-c(2 : 16)) |> 
   pivot_longer(
     cols = -variety,
     names_to = "variable",
-    values_to = "rendement"
+    values_to = "value"
   )  |> 
   separate(variable,
            into = c("type", "location", "N"),
            sep = "_", remove = TRUE) |> 
-  filter(N == "N2") |> 
-  mutate(rendement = as.numeric(rendement))
+  filter(N == "N2")
 
-montego_rendment <- dta_pheno_V10 |> 
-  filter(variety == "R_243_Montego") |> 
-  select(-c(2 : 16)) |> 
-  pivot_longer(
-    cols = -variety,
-    names_to = "variable",
-    values_to = "rendement"
-  )  |> 
-  separate(variable,
-           into = c("type", "location", "N"),
-           sep = "_", remove = TRUE) |> 
-  filter(N == "N2") |> 
-  mutate(rendement = as.numeric(rendement))
 unique(montego_rendment$location)
 
 ```
@@ -61,15 +50,6 @@ BGA15, INRAE15, LE15, R2N15, SYN15, TI15, MAD15
 
 
 
-```{r}
-
-ggplot(montego_rendment) +
-  aes(type, rendement) +
-  geom_boxplot(jitter = TRUE) + facet_wrap(~type)
-
-p <- ggplot(mpg, aes(class, hwy))
-p + geom_boxplot()
-```
 
 
 
@@ -145,7 +125,7 @@ mfa_pheno_SSP_inv <- FactoMineR::MFA(
 
 SY	Seed Yield → rendement en graines ou grains
 
-SN	Spike Number → nombre d’épis par plante ou par unité de surface
+SN	Spike Number → nombre d’épis par plante ou par unité de surface OU Seed Number
 
 TSW	Thousand Seed Weight → poids de 1000 graines, indicateur de taille/poids des grains
 
