@@ -4,8 +4,7 @@ format: html
 ---
 
 ```{r}
-library(tidyr)
-library(dplyr)
+library(tidyverse)
 library(stringr)
 ```
 
@@ -63,12 +62,12 @@ BGA15, INRAE15, LE15, R2N15, SYN15, TI15, MAD15
 
 ```{r}
 
-ggplot(montego_rendment) +
-  aes(type, rendement) +
-  geom_boxplot(jitter = TRUE) + facet_wrap(~type)
+ggplot(montego_rendment, aes(type, rendement)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  facet_wrap(~ type, scales = "free_y")
 
-p <- ggplot(mpg, aes(class, hwy))
-p + geom_boxplot()
+
 ```
 
 
