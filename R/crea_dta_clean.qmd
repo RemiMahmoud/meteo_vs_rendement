@@ -139,7 +139,10 @@ dts <- list(
   BGA15 = BGA15,
   RAGT15 = RAGT15,
   MAD15 = MAD15,
-  INRA16 = INRA16
+  INRA16 = INRA16, 
+  INRA17 = INRA17,
+  INRA18 = INRA18,
+  EUR18 = EUR18
 )
 dt <- imap_dfr(dts, ~ mutate(exp = .y, .x))
 names(dt)
