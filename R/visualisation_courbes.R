@@ -14,4 +14,4 @@ summary(dt_courbe)
 
 dt_courbe$exp=as.factor(dt_courbe$exp)
 dt_courbe$JOUR_MOIS <- as.Date(paste0("2025/", dt_courbe$JOUR_MOIS), format="%Y/%d/%m")
-
+ 
