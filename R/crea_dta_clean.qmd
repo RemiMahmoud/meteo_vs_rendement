@@ -84,6 +84,7 @@ read_meteo <- function(link){
   data <- data[, -c(1:2)]  # 2 ->3
   
   data <- data |> mutate_all(as.numeric)
+  data <- data |> mutate(DATE = as_date(DATE, origin = "1899-12-30"))
 }
 
 ```
