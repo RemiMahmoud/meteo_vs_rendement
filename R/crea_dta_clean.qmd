@@ -55,7 +55,7 @@ sans meteo
 
 Regarder la météo
 ```{r}
-link = "data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.4_R2014/191018_EUR14_IPC_Calcul_ok.xlsx"
+
 read_meteo <- function(link){
   data <- read_excel(link, col_names = FALSE) |> 
     mutate_all(as.character) |> 
@@ -139,13 +139,18 @@ dts <- list(
   BGA15 = BGA15,
   RAGT15 = RAGT15,
   MAD15 = MAD15,
+ INRA16 = INRA16
+)
+
   INRA16 = INRA16, 
   INRA17 = INRA17,
   INRA18 = INRA18,
   EUR18 = EUR18
-)
+  
 dt <- imap_dfr(dts, ~ mutate(exp = .y, .x))
 names(dt)
+
+rm(INRA11,BGA11,INRA12,INRA13,TI13,EUR14,SYN14,MAD14,RAGT14,TI15,LIM15,SYN15,INRA15,BGA15,RAGT15,MAD15,INRA16,INRA17,INRA18,EUR18)
 
 ```
 

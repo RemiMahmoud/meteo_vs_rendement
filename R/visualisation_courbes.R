@@ -5,7 +5,7 @@ library(tidyverse)
 library(ggplot2)
 
 # formatage DATE
-dt_courbe <- dt %>%
+dt_courbe <- dt |> 
   mutate(DATE = as_date(DATE, origin = "1899-12-30"))
 dt_courbe$ANNEE <- year(dt_courbe$DATE)
 dt_courbe$JOUR_MOIS <- format(dt_courbe$DATE, "%d-%m") 
@@ -15,3 +15,4 @@ summary(dt_courbe)
 dt_courbe$exp=as.factor(dt_courbe$exp)
 dt_courbe$JOUR_MOIS <- as.Date(paste0("2025/", dt_courbe$JOUR_MOIS), format="%Y/%d/%m")
  
+mutate("nb_jours" = as.numeric(yday(debut) - make_date(year(yday(debut)), 9, 1)))
