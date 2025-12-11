@@ -1,0 +1,201 @@
+---
+title: "recup_rendement"
+format: html
+---
+
+```{r}
+library(tidyverse)
+library(openxlsx)
+```
+
+# 14-15
+```{r}
+
+dta_pheno_V10 <- read.csv2("data/pheno_data/Phenotypes_V10_173_ordered.csv", sep = ",")
+
+dta_pheno_V10[, -1] <- lapply(dta_pheno_V10[, -1], as.numeric)
+
+```
+
+
+Montego et aviso 14-15
+```{r}
+
+aviso_rendment <- dta_pheno_V10 |> 
+  filter(variety == "BRA_008_Aviso") |> 
+  select(-c(2 : 16)) |> 
+  pivot_longer(
+    cols = -variety,
+    names_to = "variable",
+    values_to = "value"
+  )  |> 
+  separate(variable,
+           into = c("type", "exp", "N"),
+           sep = "_", remove = TRUE) |> 
+  filter(N == "N2") |> 
+  mutate(value = as.numeric(value),
+         type = factor(type),
+         variety = factor(variety))
+
+montego_rendment <- dta_pheno_V10 |> 
+  filter(variety == "R_243_Montego") |> 
+  select(-c(2 : 16)) |> 
+  pivot_longer(
+    cols = -variety,
+    names_to = "variable",
+    values_to = "value"
+  )  |> 
+  separate(variable,
+           into = c("type", "exp", "N"),
+           sep = "_", remove = TRUE) |> 
+  filter(N == "N2") |> 
+  mutate(value = as.numeric(value),
+         type = factor(type),
+         variety = factor(variety))
+
+unique(montego_rendment$location)
+summary(montego_rendment)
+
+dt_rendement1415 <- rbind(aviso_rendment, montego_rendment)|> 
+  select(variety, exp, type, value)
+
+```
+
+
+
+# avant et après 14-15
+
+```{r}
+
+read_rend <- function(link){
+  data_rend <- read.xlsx(xlsxFile = link,
+                         fillMergedCells = TRUE,
+                         colNames = TRUE, 
+                         na.strings = "-",
+                         sheet = "Data") |> 
+    filter(engrais == "N2",
+           LotName %in% c("montego", "aviso")) |> 
+    rename("variety" = LotName) |> 
+    group_by(variety) |> 
+    mutate(SN_value = as.numeric(SN_value),
+           SY_value = as.numeric(SY_value),
+           TSW_value = as.numeric(TSW_value),
+           SYNORM_value = as.numeric(SYNORM_value)) |> 
+    summarise(SN = mean(SN_value, na.rm = T),
+              SY = mean(SY_value, na.rm = T),
+              TSW = mean(TSW_value, na.rm = T),
+              SYNORM_value = mean(SYNORM_value, na.rm = T))
+}
+
+```
+
+
+
+
+```{r}
+
+rend_INRA11 <- read_rend("data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.1_2010-2011_G/Ephesis LR11AM.xlsx")
+rend_BGA11 <- read_rend("data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.1_2010-2011_G/Ephesis Md11AM.xlsx")
+
+rend_INRA12 <- read_rend("data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.2_2011-2012_G/Ephesis LR12AM.xlsx")
+
+rend_INRA13 <- read_rend("data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.3_2012-2013_G/Ephesis LR13AM.xlsx")
+rend_TI13 <- read_rend("data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.3_2012-2013_G/Ephesis Dij13AM.xlsx")
+
+rend_INRA16 <- read_rend("data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.6_2015-2016_RWP3_RWP4/170705_Ephesis Le Rheu 2016.xlsx")
+
+rend_INRA17 <- # pas de data rendement
+  
+  rend_INRA18 <- read.xlsx(xlsxFile = "data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.8_2017-2018_RWP2_RWP4/LR_2018/Rendements SY Aviso_Montego Canopy A.xlsx",
+                           fillMergedCells = TRUE,
+                           colNames = TRUE,
+                           startRow = 2,
+                           na.strings = "-") |> 
+  filter(N == "N2") |> 
+  rename("variety" = Génotype, 
+         "SY_value" = SY) |> 
+  mutate(variety = factor(variety),
+         SY_value = as.numeric(SY_value)) |> 
+  group_by(variety) |> 
+  summarise(SY = mean(SY_value)) |> 
+  mutate(SN = NA,
+         TSW = NA,
+         SYNORM_value = NA) |> 
+  select(variety, SN, SY, TSW, SYNORM_value)
+
+
+rend_EUR18 <- read.xlsx(xlsxFile = "data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.8_2017-2018_RWP2_RWP4/EURA_BLO_2018_Matrice_Essai_WP4_DATA.xlsx",
+                        fillMergedCells = TRUE,
+                        colNames = TRUE,
+                        na.strings = "-",
+                        sheet = "PHENO_DATA") |> 
+  filter(Modalite == "N+",
+         Code_RAPSO %in% c("montego", "aviso")) |> 
+  rename("variety" = Code_RAPSO, 
+         "SY_value" = SY,
+         "TSW_value" = TSW) |> 
+  mutate(variety = factor(variety),
+         SY_value = as.numeric(SY_value),
+         TSW_value = as.numeric(TSW_value)) |> 
+  group_by(variety) |> 
+  summarise(SY = mean(SY_value),
+            TSW = mean(TSW_value)) |> 
+  mutate(SN = SY*100000/TSW,
+         SYNORM_value = NA) |> 
+  select(variety, SN, SY, TSW, SYNORM_value)
+
+```
+
+
+
+
+merge rendment 
+```{r}
+
+dts <- list(
+  INRA11 = rend_INRA11,
+  BGA11 = rend_BGA11,
+  INRA12 = rend_INRA12,
+  INRA13 = rend_INRA13,
+  TI13 = rend_TI13,
+  INRA16 = rend_INRA16,
+  INRA18 = rend_INRA18,
+  EUR18 = rend_EUR18
+)
+dt_rend <- imap_dfr(dts, ~ mutate(exp = .y, .x)) |> 
+  mutate(SY = if_else(!is.na(SYNORM_value), SYNORM_value, SY)) |> 
+  select(-SYNORM_value) |> 
+  pivot_longer(c(SN, SY, TSW),
+               names_to = "type")|>
+  mutate(variety = if_else(variety == "aviso", "BRA_008_Aviso", variety),
+         variety = if_else(variety == "montego", "R_243_Montego", variety))
+
+
+
+```
+
+
+fusion data rendement
+
+```{r}
+
+data_rendement <- rbind(dt_rendement1415, dt_rend)
+
+```
+
+
+
+```{r}
+
+ggplot(dt_rendement, aes("", value)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  facet_grid(type ~ variety, scales = "free_y") + 
+  theme_classic() + 
+  labs(
+    x = "",
+    y = ""
+  )
+
+```
+

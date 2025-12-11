@@ -26,7 +26,7 @@ summary(dta_pheno_V10)
 Montego
 ```{r}
 
-montego_rendment <- dta_pheno_V10 |> 
+aviso_rendment <- dta_pheno_V10 |> 
   filter(variety == "BRA_008_Aviso") |> 
   select(-c(2 : 16)) |> 
   pivot_longer(
@@ -37,9 +37,32 @@ montego_rendment <- dta_pheno_V10 |>
   separate(variable,
            into = c("type", "location", "N"),
            sep = "_", remove = TRUE) |> 
-  filter(N == "N2")
+  filter(N == "N2") |> 
+  mutate(value = as.numeric(value),
+         type = factor(type),
+         variety = factor(variety))
+
+montego_rendment <- dta_pheno_V10 |> 
+  filter(variety == "R_243_Montego") |> 
+  select(-c(2 : 16)) |> 
+  pivot_longer(
+    cols = -variety,
+    names_to = "variable",
+    values_to = "value"
+  )  |> 
+  separate(variable,
+           into = c("type", "location", "N"),
+           sep = "_", remove = TRUE) |> 
+  filter(N == "N2") |> 
+  mutate(value = as.numeric(value),
+         type = factor(type),
+         variety = factor(variety))
 
 unique(montego_rendment$location)
+summary(montego_rendment)
+
+dt_rendement <- rbind(aviso_rendment, montego_rendment) |> 
+  select(-N)
 
 ```
 
@@ -48,11 +71,20 @@ BGA15, INRAE15, LE15, R2N15, SYN15, TI15, MAD15
 
 
 
+# Plot SN, SY, TSW pour variété
 ```{r}
-ggplot(montego_rendment, aes(type, rendement)) +
+
+ggplot(dt_rendement, aes("", value)) +
   geom_boxplot() +
   geom_jitter(width = 0.2, alpha = 0.5) +
-  facet_wrap(~ type, scales = "free_y")
+  facet_grid(type ~ variety, scales = "free_y") + 
+  theme_classic() + 
+  labs(
+    x = "",
+    y = ""
+  )
+
+
 ```
 
 
