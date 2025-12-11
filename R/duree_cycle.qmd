@@ -19,10 +19,15 @@ hiver <- read_excel("Climatic_Winter_problème.xlsx") |>
   separate(col = lieuXannee, 
            into = c("lieux", "annee"), 
            sep = "(?<=\\D)(?=\\d)") |> 
-  mutate("duree_hiver" = fin - debut)
+  mutate("duree_hiver" = fin - debut) |> 
+  mutate("nb_jours" = as.numeric(yday(debut) - make_date(year(yday(debut)), 9, 1)))
 
 hiver |> 
   ggplot(aes(x = annee, y = duree_hiver, colour = lieux)) +
+  geom_point()
+
+hiver |> 
+  ggplot(aes(x = annee, y = as.numeric(yday(debut) - make_date(year(yday(debut)), 9, 1)), colour = lieux)) +
   geom_point()
 
 ```
