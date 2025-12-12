@@ -114,6 +114,18 @@ rm(INRA11,BGA11,INRA12,INRA13,TI13,EUR14,SYN14,MAD14,RAGT14,TI15,LIM15,SYN15,INR
 ```
 
 
+# ACP variable météo
+
+```{r}
+
+
+
+
+```
+
+
+
+
 
 # Visualisation Météo
 
@@ -221,12 +233,12 @@ graph_Photoper <- dt_meteo  |>
     limits = as.Date(c("2000-08-15", "2001-08-15"))
   )
 
-graph_TEMP_T_Q
-graph_E.HYD_PRELIQ
-graph_E.HYD_CUMMUL_P
-graph_E.HYD_ETAT
-graph_RAYO
-graph_Photoper
+graph_TEMP_T_Q        # temp moyenne entre min et max
+graph_E.HYD_PRELIQ    # précipitation en mm
+graph_E.HYD_CUMMUL_P  # Cummul de précipitation en mm
+graph_E.HYD_ETAT      # reserve utile, quantité d'eau dans le sol
+graph_RAYO            # Quantité de lumière par unité de surface recu
+graph_Photoper        # Durée jour / durée nuit
 
 
 ```
