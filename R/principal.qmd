@@ -1,0 +1,86 @@
+---
+title: "principal"
+format: html
+---
+
+# Library
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+```
+
+# Résumé par experiences
+
+```{r}
+
+ind_dev <- read_excel("data/climate_data/indicateurs_pedologiques/191021_Indicators_Dev_Meta_Network - Version_utilisable.xlsx") |>
+  separate("ENVIRONNEMENT / PARTENAIRE", c('ENVIRONNEMENT', 'PARTENAIRE')) |> 
+  filter(`AZOTE INITIAL LABEL` == "N2") |> 
+  filter(`Probe Genotype` == "Montego")
+
+```
+
+il faut ajouter le rendement, les temps de chaque cycle pour chaque expérience
+
+
+
+# Rendement
+
+
+
+# Meteo
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,56 +1,15 @@
 ---
-title: "crea_dta_clean"
+title: "meteo"
 format: html
 ---
+
 
 Librairies
 ```{r}
 library(tidyverse)
 library(readxl)
-
+library(lubridate)
 ```
-
-Importer les données
-```{r}
-
-ind_dev <- read_excel("data/climate_data/indicateurs_pedologiques/191021_Indicators_Dev_Meta_Network - Version_utilisable.xlsx") |>
-  separate("ENVIRONNEMENT / PARTENAIRE", c('ENVIRONNEMENT', 'PARTENAIRE')) |> 
-  filter(`AZOTE INITIAL LABEL` == "N2") |> 
-  filter(`Probe Genotype` == "Montego")
-
-```
-
-
-Avec meteo 
-- INRA11
-- BGA11
-
-- INRA12
-
-- INRA13
-- TI13
-
-- EUR14
-- SYN14
-- MAD14
-- RAGT14
-
-- TI15
-- LIM15
-- SYN15
-- INRA15
-- BGA15
-- RAGT15
-- MAD15
-
-- INRA16
-
-- INRA17
-
-- INRA18
-- EUR18BLO
-
-sans meteo
 
 
 Regarder la météo
@@ -80,7 +39,7 @@ read_meteo <- function(link){
   
   data <- data |> 
     filter(! is.na(DATE))
-
+  
   data <- data[, -c(1:2)]  # 2 ->3
   
   data <- data |> mutate_all(as.numeric)
@@ -146,7 +105,7 @@ dts <- list(
   EUR18 = EUR18
 )
 
-dt <- imap_dfr(dts, ~ mutate(exp = .y, .x))
+dt_meteo <- imap_dfr(dts, ~ mutate(exp = .y, .x))
 names(dt)
 
 rm(INRA11,BGA11,INRA12,INRA13,TI13,EUR14,SYN14,MAD14,RAGT14,TI15,LIM15,SYN15,INRA15,BGA15,RAGT15,MAD15,INRA16,INRA17,INRA18,EUR18)
@@ -155,125 +114,157 @@ rm(INRA11,BGA11,INRA12,INRA13,TI13,EUR14,SYN14,MAD14,RAGT14,TI15,LIM15,SYN15,INR
 
 
 
+# Visualisation Météo
+
 ```{r}
 
-INRA11 |>
-  ggplot() +
-  aes(x = DATE, y = TEMP_T_Q) + 
-  geom_point()
+graph_meteo <- dt_meteo  |> 
+  mutate(
+    m = month(DATE),
+    d = day(DATE),
+    fake_year = if_else(
+      (m > 8) | (m == 8 & d >= 15), 2000, 2001),
+    date_no_year = as.Date(sprintf("%04d-%02d-%02d", fake_year, m, d))) |> 
+  ggplot(aes(x = date_no_year, y = TEMP_T_Q, color = exp, group = exp)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date (sans année)", y = "Valeur") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_date(
+    date_labels = "%d-%b",
+    limits = as.Date(c("2000-08-15", "2001-08-15"))
+  )
 
+graph_meteo
 
 ```
 
 
-trouver hiver 
+
+# lecture landmarks
+
 ```{r}
 
-lm_hiver <- function(vec_temp, jours_debut = 3, jours_fin = 5){
-  
-  l <- length(vec_temp)
-  
-  ind_d <- rep(1, l-jours_debut+1)
-  
-  for(i in 1:jours_debut){
-    ind_d <- ind_d * (vec_temp[i:(l-jours_debut+i)]<=5)
-  }
-  debut_hiver <- which.min(ind_d == 0)
-  
-  ind_f <- c(rep(0, debut_hiver), rep(1, l-jours_fin+1-debut_hiver))
-  
-  for(i in 1:jours_fin){
-    ind_f <- ind_f * (vec_temp[i:(l-jours_fin+i)]>=5)
-  }
-  fin_hiver <- which.min(ind_f == 0)
-  
-  hiver <- c(debut_hiver, debut_hiver + jours_debut- 1, fin_hiver, fin_hiver + jours_fin - 1)
-  print(hiver)
-  return(hiver)
-}
+landmarks <- read_excel("data/Date_landmarks_20essais.xlsx") |>
+  select(PARTENAIRE, ENVIRONNEMENT, YEAR, DEBUT_CW, FIN_CW, FLORAISON, DUREE_CW, DUREE_FLO)
 
 ```
 
 
+Durée de chaque période
 ```{r}
 
-hiv_INRA11 <- lm_hiver(INRA11$TEMP_T_Q, jours_debut = 3, jours_fin = 5)
-hiv_BGA11 <- lm_hiver(BGA11$TEMP_T_Q, jours_debut = 3, jours_fin = 5)
-
-```
-
-
-fabrique les landsmarks
-```{r}
-
-
-make_lm <- function(data, jours_debut = 3, jours_fin = 5){
-  t0 <- data[1, 1] - 1
-  vec_temp <- data$TEMP_T_Q
-  
-  lm_hiver <- lm_hiver(vec_temp, jours_debut, jours_fin)
-  t0 + c(1, lm_hiver, length(vec_temp))
-}
-
-lm_INRA11 <- make_lm(INRA11)
-lm_BGA11 <- make_lm(BGA11)
-
-```
-
-
-fabriques les references comme la moyennes de landmarks 
-```{r}
-
-make_ref <- function(list_lm){
-  ref <- round(colMeans(do.call(rbind, list_lm)))
-}
-
-ref <- make_ref(list(make_lm(INRA11), make_lm(BGA11)))
-```
-round pertiant ??
-
-
-
-```{r}
-
-make_spline <- function(list_lm, ref = NA){
-  if (is.na(ref)){
-    ref <- make_ref(list_lm)
-  }
-  
-  lapply(list_lm, function(lm) splinefun(x = ref, y = lm, method = "monoH.FC"))
-}
-
-spline <- make_spline(list_lm = list(make_lm(INRA11), make_lm(BGA11)))
-
-```
-
-
-```{r}
-
-dt_temp_INRA11 <- data.frame(date = INRA11$DATE, temp = INRA11$TEMP_T_Q, champ = "INRA11")
-dt_temp_BGA11 <- data.frame(date = BGA11$DATE, temp = BGA11$TEMP_T_Q, champ = "BGA11")
-dt_temp <- rbind(dt_temp_INRA11, dt_temp_BGA11)
-
-ggplot(dt_temp) +
-  aes(x = date, y = temp, col = champ) + 
+landmarks |> 
+  select(YEAR, ENVIRONNEMENT, DUREE_CW, DUREE_FLO) |> 
+  pivot_longer(c(DUREE_CW, DUREE_FLO), names_to = "DUREE") |> 
+  ggplot(aes(x = YEAR, y = value, colour = ENVIRONNEMENT)) +
   geom_point() +
-  geom_vline(xintercept = lm_INRA11, color = "blue") +
-  geom_vline(xintercept = lm_BGA11, color = "orange")
+  facet_wrap(~DUREE)
 
 ```
+La floraison dure trois semaines
 
-Plot spline
+
+# landmark
+
 ```{r}
-lm <- c(lm_INRA11, lm_BGA11)
-x <- seq(min(lm), max(lm), length.out = 1000)
-dt_spline <- data.frame(x = x)
-for (i in length(spline)){
-  spline[1](x)
-  
-}
+
+
+landmarks |> 
+  mutate(
+    m_d = month(DEBUT_CW),
+    d_d = day(DEBUT_CW),
+    fake_year_d = if_else(
+      (m_d > 8) | (m_d == 8 & d_d >= 15), 2000, 2001),
+    date_d = as.Date(sprintf("%04d-%02d-%02d", fake_year_d, m_d, d_d))) |> 
+  select(-c(m_d, d_d, fake_year_d)) |> 
+  mutate(
+    m_f = month(FIN_CW),
+    d_f = day(FIN_CW),
+    fake_year_f = if_else(
+      (m_f > 8) | (m_f == 8 & d_f >= 15), 2000, 2001),
+    date_f = as.Date(sprintf("%04d-%02d-%02d", fake_year_f, m_f, d_f))) |> 
+  select(-c(m_f, d_f, fake_year_f)) |> 
+  mutate(
+    m_flo = month(FLORAISON),
+    d_flo = day(FLORAISON),
+    fake_year_flo = if_else(
+      (m_flo > 8) | (m_flo == 8 & d_flo >= 15), 2000, 2001),
+    date_flo = as.Date(sprintf("%04d-%02d-%02d", fake_year_flo, m_flo, d_flo))) |> 
+  select(-c(m_flo, d_flo, fake_year_flo)) |> 
+  select(YEAR, ENVIRONNEMENT, date_d, date_f, date_flo) |> 
+  pivot_longer(c(date_d, date_f, date_flo), names_to = "date") |> 
+  ggplot(aes(x = date, y = value)) +
+  geom_boxplot(outlier.shape = NA) +      
+  geom_jitter(aes(colour = ENVIRONNEMENT),   
+              width = 0.2,
+              alpha = 0.6)
+
+
+l
+
+
+
+
+
+
+landmarks |> 
+  mutate(
+    m_d = month(DEBUT_CW),
+    d_d = day(DEBUT_CW),
+    fake_year_d = if_else((m_d > 8) | (m_d == 8 & d_d >= 15), 2000, 2001),
+    date_d = as.Date(sprintf("%04d-%02d-%02d", fake_year_d, m_d, d_d)),
+    m_f = month(FIN_CW),
+    d_f = day(FIN_CW),
+    fake_year_f = if_else((m_f > 8) | (m_f == 8 & d_f >= 15), 2000, 2001),
+    date_f = as.Date(sprintf("%04d-%02d-%02d", fake_year_f, m_f, d_f)),
+    m_flo = month(FLORAISON),
+    d_flo = day(FLORAISON),
+    fake_year_flo = if_else((m_flo > 8) | (m_flo == 8 & d_flo >= 15), 2000, 2001),
+    date_flo = as.Date(sprintf("%04d-%02d-%02d", fake_year_flo, m_flo, d_flo))
+  ) |> 
+  select(YEAR, ENVIRONNEMENT, date_d, date_f, date_flo) |> 
+  pivot_longer(c(date_d, date_f, date_flo),
+               names_to = "type_date",
+               values_to = "value") |> 
+
+  ggplot(aes(x = type_date, y = value)) +
+  geom_boxplot(outlier.shape = NA) +      
+  geom_jitter(aes(colour = ENVIRONNEMENT),   
+              width = 0.2,
+              alpha = 0.6) +
+  theme_minimal()
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
