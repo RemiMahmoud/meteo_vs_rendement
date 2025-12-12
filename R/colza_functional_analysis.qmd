@@ -1,0 +1,304 @@
+---
+title: "Analyse fonctionnelle du Colza"
+format: pdf
+editor: source
+---
+
+```{r library}
+library(tidyverse)
+library(fda)
+library(RColorBrewer)
+library(patchwork)
+library(fda)
+library(FactoMineR)
+require(splines)
+#Pour la régression fonctionnelle:
+#https://cran.r-project.org/web/packages/robflreg/robflreg.pdf
+library(robflreg)
+```
+
+## Première ACP fonctionnelle sur les données
+
+Le but ici n'est pas de réaliser une belle ACP fonctionnelle ou d'analyser les données, il s'agit juste de se familiariser avec la méthode.
+
+```{r premiere_ACP}
+#| echo: false
+#| eval: false
+
+
+rangeval <- c(min(wavelength), max(wavelength)) # définition de l'échelle (les longueurs d'ondes)
+nbasis <- 50 # Nombre de splines utilisées
+basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis) # création d'une base d'objet
+
+# convertir les données discrètes en fd (estimation par régression sur la base)
+fdsmooth <- smooth.basis(argvals = wavelength, y = as.matrix(t(snv_x)), fdParobj = basisobj)
+# pour y les lignes doivent être les valeurs discrètes et les colonnes les individus
+
+fdobj <- fdsmooth$fd
+
+# ACP fonctionnelle
+res.fpca <- pca.fd(fdobj)
+plot.pca.fd(res.fpca)
+```
+
+On réalise maintenant une ACP fonctionnelle sur nos données issues de corrections BLUP. On commence par les graines
+
+```{r}
+
+# créer vecteur des longueurs d'ondes
+wavelength <- as.numeric(names(graines_BLUP[,-1]))
+
+rangeval <- c(min(wavelength), max(wavelength)) 
+nbasis <- 50 # Nombre de splines utilisées
+basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis) # création d'une base d'objet
+
+# convertir les données discrètes en fd (estimation par régression sur la base)
+fdsmooth <- smooth.basis(argvals = wavelength, y = t(as.matrix(graines_BLUP[-1])), fdParobj = basisobj)
+# pour y les lignes doivent être les valeurs discrètes et les colonnes les individus
+
+fdobj <- fdsmooth$fd
+
+# ACP fonctionnelle
+res.fpca <- pca.fd(fdobj, harmfdPar = fdPar(fdobj = fdobj, lambda = 10))
+plot.pca.fd(res.fpca, pointplot = F)
+
+# res.fpca$harmonics$coefs
+# Les harmonics sont les dimensions. Une harmonique = une fonction
+# 
+# res.fpca$meanfd$coefs
+# coefficients de la base (ici splines) pour la courbe moyenne
+
+# Affichage du nuage des individus
+plot(res.fpca$scores, type = "p")
+
+# On essaye de lisser les courbes pour lisser les tendances
+res.fpca <- pca.fd(fdobj, harmfdPar = fdPar(fdobj = basisobj,lambda = 1e6))
+p1 <- eval.fd(wavelength, res.fpca$harmonics) %>% 
+  as_tibble() %>% 
+  mutate(wavelength = wavelength) %>% 
+  pivot_longer(-wavelength, names_to = "component") %>% 
+  ggplot(aes(x =  wavelength, y=  value)) +
+  geom_line(aes(group = component, color = component), linewidth = 1) +
+  scale_color_brewer(palette = "Dark2")+
+  ggtitle("Avec lissage")+
+  theme(plot.title  = element_text(hjust = 0.5))
+
+res.fpca <- pca.fd(fdobj)
+p2 <- eval.fd(wavelength, res.fpca$harmonics) %>% 
+  as_tibble() %>% 
+  mutate(wavelength = wavelength) %>% 
+  pivot_longer(-wavelength, names_to = "component") %>% 
+  ggplot(aes(x =  wavelength, y=  value)) +
+  geom_line(aes(group = component, color = component), linewidth = 1) +
+  scale_color_brewer(palette = "Dark2")+
+  ggtitle("Sans lissage")+
+  theme(plot.title = element_text(hjust = 0.5))
+  
+p1 / p2
+
+
+# Affichage des 2 premières dimensions
+eval.fd(wavelength, res.fpca$harmonics) %>% 
+  as_tibble() %>% 
+  mutate(wavelength = wavelength) %>% 
+  pivot_longer(-wavelength, names_to = "component") %>% 
+  ggplot(aes(x =  wavelength, y=  value)) +
+  geom_line(aes(group = component, color = component), linewidth = 1) +
+  scale_color_brewer(palette = "Dark2")
+
+# Affichage des 2 premières dimensions avec la moyenne
+eval.fd(wavelength, res.fpca$harmonics) %>% 
+  as_tibble() %>% 
+  mutate(wavelength = wavelength, mean = eval.fd(wavelength, res.fpca$meanfd)) %>% 
+  pivot_longer(-wavelength, names_to = "component") %>% 
+  ggplot(aes(x =  wavelength, y=  value)) +
+  geom_line(aes(group = component, color = component), linewidth = 1) +
+  scale_color_brewer(palette = "Dark2")
+
+# Affichage de tous les spectres
+plot(fdobj)
+lines(res.fpca$meanfd, lwd = 1, col = "red")
+plot(res.fpca$meanfd, lwd = 2, col = "red")
+lines(eval.fd(wavelength, res.fpca$harmonics))
+```
+
+On réalise une AFM sur les données phénotypiques. Le but est d'extraire des cluster phénotypiques avec une Classification Ascendante Hiérarchique.
+
+```{r}
+# AFM
+res_MFA <- MFA(pheno, group=c(1,14,9), type=c("n","s","s"),
+ncp=5, name.group=c("Variété", "traits_physio","traits_dev"),
+num.group.sup=c(1), graph = FALSE)
+
+# Affichage des variables
+plot.MFA(res_MFA, choix = "var")
+
+# Classification sur les individus
+res.HCPC <- HCPC(res_MFA, nb.clust = -1)
+pheno_clust <- res.HCPC$data.clust
+
+# On réalise une AFM sur le jeu de donnée de départ en ajoutant le cluster en supplémentaire
+res_MFA <- MFA(res.HCPC$data.clust, group=c(1,14,9,1), type=c("n","s","s","n"),
+ncp=5, name.group=c("Variété", "traits_physio","traits_dev","cluster"),
+num.group.sup=c(1,4), graph = FALSE)
+
+# On affiche les individus colorés en fonction du cluster
+plot.MFA(res_MFA, choix = "ind",
+         axes = c(1,2), 
+         habillage = "clust", 
+         invisible = "quali.sup",
+         label = "none")
+```
+
+Avec les cluster obtenus sur les phénotypes, on fait le lien entre les dataset
+
+```{r}
+colnames(graines_MEAN) <- as.character(c("Genotype", 817:2764))
+
+wavelength <- as.numeric(names(graines_MEAN[,-1]))
+
+
+rangeval <- c(min(wavelength), max(wavelength)) 
+nbasis <- 50 # Nombre de splines utilisées
+basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis) # création d'une base d'objet
+
+# convertir les données discrètes en fd (estimation par régression sur la base)
+fdsmooth <- smooth.basis(argvals = wavelength, y = t(as.matrix(graines_MEAN[-1])), fdParobj = basisobj)
+# pour y les lignes doivent être les valeurs discrètes et les colonnes les individus
+
+fdobj <- fdsmooth$fd
+
+# ACP fonctionnelle
+res.fpca <- pca.fd(fdobj, harmfdPar = fdPar(fdobj = fdobj, lambda = 10))
+
+var_clust <- data.frame(Genotype = pheno_clust$variety,
+                        cluster = pheno_clust$clust)
+
+plot(res.fpca$scores)
+
+as.data.frame(res.fpca$scores) %>% 
+  mutate(Genotype = graines_MEAN$Genotype) %>% 
+  left_join(var_clust, by = "Genotype") %>%
+  group_by(cluster) %>% 
+  ggplot() +
+  aes(x = V1, y = V2, col = cluster) +
+  geom_point()+
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed")
+```
+
+```{r join_test}
+df1 <- data.frame(type = factor(c(1:12)),
+                  clust = factor(sample(c(1,2,3), size = 12, replace = T)))
+summary(df1)
+
+df2 <- data.frame(type = factor(c(1:14)),
+                  coordx = rnorm(14, 0, 2),
+                  coordy = rnorm(14, 0, 10))
+
+summary(df1) ; summary(df2)
+
+df2 %>% right_join(df1, by = 'type') %>% group_by(clust) %>% 
+  ggplot() +
+  aes(x = coordx, y = coordy, col = clust) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed")
+
+
+```
+
+## Regression fonctionnelle
+
+Importation des données NIRS
+
+```{r}
+feuille_seche <- read.table("data/NIRS_experiment/Feuilles_seches/nirs_powder_MEAN.csv", sep = ",", header = TRUE)  
+
+#Changement des noms de colonnes 
+colnames(feuille_seche) <- as.character(c("Genotype", 817:2764))  
+
+#Suppression de l'individu abhérant détecté dans le script these_results 
+feuille_seche <- feuille_seche %>% filter(Genotype != "NAVIG_215")
+```
+
+Importation des phénotypes
+
+```{r}
+pheno <- read.table("data/Pheno/Vigueur_precoce/df_BLUES_VP_ready_GWAS.csv", sep = ";", header = TRUE) 
+pheno <- pheno[,-1]  
+
+cols <- c("LA","TDW","ADW","RDW","LWR","LAR","SLA","SR","SNQ","LASNQ","TNQ",
+          "SNU","NUtE_TOT","NUtE_AER","Sp_L1_L4","Sp_L1_L2","Sp_L2_L3",
+          "Sp_L3_L4","SCA")  
+
+pheno <- pheno |>    
+  mutate(across(all_of(cols), as.numeric))  
+
+#Changement des noms de colonnes 
+pheno <- pheno |>    
+  rename(Genotype = variety)  
+
+#Suppression de l'individu abhérant détecté dans le script these_results 
+pheno <- pheno %>% filter(Genotype != "NAVIG_215")
+```
+
+Fusion de feuille_seche et pheno
+
+```{r}
+NIRS_pheno <- pheno |>    
+  left_join(feuille_seche) |>    
+  distinct(Genotype, .keep_all =TRUE)
+```
+
+#### Réalisation du modèle Linear Scalar-on-Function Regression (LSFR)
+
+$$Y = \beta_0 + \int_{t} X\left(t\right)\beta\left(t\right)\mathrm{d}t + \epsilon$$
+
+1.  Création des fonctions de bases pour les spectres $X(t)$
+```{r}
+#Nombre de fonction de base
+nbases = 50
+
+#Création des splines
+abs_bases <- create.bspline.basis(c(817,2764), nbases)
+
+#Représentation des splines
+plot(abs_bases)
+```
+
+2.  Création des fonctions des spectres
+```{r}
+#Extraction des valeurs d'absorbances
+y <- as.matrix(NIRS_pheno[, 25:1972])
+
+# On transpose y pour que les observations soient en colonne
+yt <- t(y)
+argvals <- as.numeric(colnames(y))
+
+#Création d'une fonction pour tous les spectres
+spectre_f <- smooth.basis(argvals = argvals, yt, abs_bases)$fd
+
+#Représentation graphique
+plot(spectre_f)
+```
+
+
+```{r}
+spectres_mat <- t(eval.fd(argvals, spectre_f))
+X <- list(spectres_mat)
+
+model <- rob.sf.reg(NIRS_pheno$TDW, X, emodel = "classical", fmodel = "tau", gp = list(argvals))
+```
+
+Représentations graphiques
+```{r}
+#Réprésentation graphique des valeurs ajustées et des résidus
+plot(model[["fitted.values"]], model[["residuals"]], pch = 21, bg = "red", 
+     col = "black", xlab = "Valeurs ajustées", ylab = "Résidus")
+
+#Représentation graphique de la fonction beta1
+coefs <- get.sf.coeffs(model)
+plot_sf_coeffs(object = coefs, b = 1, col = "black")
+```
+
