@@ -9,6 +9,7 @@ Librairies
 library(tidyverse)
 library(readxl)
 library(lubridate)
+library(FactoMineR)
 ```
 
 
@@ -118,7 +119,7 @@ rm(INRA11,BGA11,INRA12,INRA13,TI13,EUR14,SYN14,MAD14,RAGT14,TI15,LIM15,SYN15,INR
 
 ```{r}
 
-graph_meteo <- dt_meteo  |> 
+graph_TEMP_T_Q <- dt_meteo  |> 
   mutate(
     m = month(DATE),
     d = day(DATE),
@@ -135,7 +136,98 @@ graph_meteo <- dt_meteo  |>
     limits = as.Date(c("2000-08-15", "2001-08-15"))
   )
 
-graph_meteo
+graph_E.HYD_PRELIQ <- dt_meteo  |> 
+  mutate(
+    m = month(DATE),
+    d = day(DATE),
+    fake_year = if_else(
+      (m > 8) | (m == 8 & d >= 15), 2000, 2001),
+    date_no_year = as.Date(sprintf("%04d-%02d-%02d", fake_year, m, d))) |> 
+  ggplot(aes(x = date_no_year, y = E.HYD_PRELIQ_Q, color = exp, group = exp)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date (sans année)", y = "Valeur") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_date(
+    date_labels = "%d-%b",
+    limits = as.Date(c("2000-08-15", "2001-08-15"))
+  )
+
+graph_E.HYD_CUMMUL_P <- dt_meteo  |> 
+  mutate(
+    m = month(DATE),
+    d = day(DATE),
+    fake_year = if_else(
+      (m > 8) | (m == 8 & d >= 15), 2000, 2001),
+    date_no_year = as.Date(sprintf("%04d-%02d-%02d", fake_year, m, d))) |> 
+  ggplot(aes(x = date_no_year, y = E.HYD_PRELIQ_Q, color = exp, group = exp)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date (sans année)", y = "Valeur") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_date(
+    date_labels = "%d-%b",
+    limits = as.Date(c("2000-08-15", "2001-08-15"))
+  )
+
+graph_E.HYD_ETAT <- dt_meteo  |> 
+  mutate(
+    m = month(DATE),
+    d = day(DATE),
+    fake_year = if_else(
+      (m > 8) | (m == 8 & d >= 15), 2000, 2001),
+    date_no_year = as.Date(sprintf("%04d-%02d-%02d", fake_year, m, d))) |> 
+  ggplot(aes(x = date_no_year, y = `E.HYD_ETAT RU_1`, color = exp, group = exp)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date (sans année)", y = "Valeur") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_date(
+    date_labels = "%d-%b",
+    limits = as.Date(c("2000-08-15", "2001-08-15"))
+  )
+
+graph_RAYO <- dt_meteo  |> 
+  mutate(
+    m = month(DATE),
+    d = day(DATE),
+    fake_year = if_else(
+      (m > 8) | (m == 8 & d >= 15), 2000, 2001),
+    date_no_year = as.Date(sprintf("%04d-%02d-%02d", fake_year, m, d))) |> 
+  ggplot(aes(x = date_no_year, y = RAYO_SSI_Q, color = exp, group = exp)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date (sans année)", y = "Valeur") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_date(
+    date_labels = "%d-%b",
+    limits = as.Date(c("2000-08-15", "2001-08-15"))
+  )
+
+graph_Photoper <- dt_meteo  |> 
+  mutate(
+    m = month(DATE),
+    d = day(DATE),
+    fake_year = if_else(
+      (m > 8) | (m == 8 & d >= 15), 2000, 2001),
+    date_no_year = as.Date(sprintf("%04d-%02d-%02d", fake_year, m, d))) |> 
+  ggplot(aes(x = date_no_year, y = Photoperiode, color = exp, group = exp)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date (sans année)", y = "Valeur") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_date(
+    date_labels = "%d-%b",
+    limits = as.Date(c("2000-08-15", "2001-08-15"))
+  )
+
+graph_TEMP_T_Q
+graph_E.HYD_PRELIQ
+graph_E.HYD_CUMMUL_P
+graph_E.HYD_ETAT
+graph_RAYO
+graph_Photoper
+
 
 ```
 
@@ -145,8 +237,16 @@ graph_meteo
 
 ```{r}
 
-landmarks <- read_excel("data/Date_landmarks_20essais.xlsx") |>
-  select(PARTENAIRE, ENVIRONNEMENT, YEAR, DEBUT_CW, FIN_CW, FLORAISON, DUREE_CW, DUREE_FLO)
+landmarks <- read_excel("data/Date_landmarks_20essais.xlsx") |> 
+  mutate(DEBUT_EXP = as.Date(DEBUT_EXP),
+         DEBUT_CW = as.Date(DEBUT_CW),
+         FIN_CW = as.Date(FIN_CW),
+         DEBUT_FLO = as.Date(DEBUT_FLO),
+         FIN_FLO = as.Date(FIN_FLO),
+         FIN_EXP = as.Date(FIN_EXP))
+
+
+summary(landmarks)
 
 ```
 
@@ -155,14 +255,16 @@ Durée de chaque période
 ```{r}
 
 landmarks |> 
-  select(YEAR, ENVIRONNEMENT, DUREE_CW, DUREE_FLO) |> 
-  pivot_longer(c(DUREE_CW, DUREE_FLO), names_to = "DUREE") |> 
+  select(YEAR, ENVIRONNEMENT, DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P) |> 
+  pivot_longer(c(DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P), names_to = "DUREE") |> 
   ggplot(aes(x = YEAR, y = value, colour = ENVIRONNEMENT)) +
   geom_point() +
-  facet_wrap(~DUREE)
+  facet_wrap(~DUREE) +
+  theme_minimal()
 
 ```
 La floraison dure trois semaines
+A mettre dans l'ordre des saisons
 
 
 # landmark
@@ -170,38 +272,8 @@ La floraison dure trois semaines
 ```{r}
 
 
-landmarks |> 
-  mutate(
-    m_d = month(DEBUT_CW),
-    d_d = day(DEBUT_CW),
-    fake_year_d = if_else(
-      (m_d > 8) | (m_d == 8 & d_d >= 15), 2000, 2001),
-    date_d = as.Date(sprintf("%04d-%02d-%02d", fake_year_d, m_d, d_d))) |> 
-  select(-c(m_d, d_d, fake_year_d)) |> 
-  mutate(
-    m_f = month(FIN_CW),
-    d_f = day(FIN_CW),
-    fake_year_f = if_else(
-      (m_f > 8) | (m_f == 8 & d_f >= 15), 2000, 2001),
-    date_f = as.Date(sprintf("%04d-%02d-%02d", fake_year_f, m_f, d_f))) |> 
-  select(-c(m_f, d_f, fake_year_f)) |> 
-  mutate(
-    m_flo = month(FLORAISON),
-    d_flo = day(FLORAISON),
-    fake_year_flo = if_else(
-      (m_flo > 8) | (m_flo == 8 & d_flo >= 15), 2000, 2001),
-    date_flo = as.Date(sprintf("%04d-%02d-%02d", fake_year_flo, m_flo, d_flo))) |> 
-  select(-c(m_flo, d_flo, fake_year_flo)) |> 
-  select(YEAR, ENVIRONNEMENT, date_d, date_f, date_flo) |> 
-  pivot_longer(c(date_d, date_f, date_flo), names_to = "date") |> 
-  ggplot(aes(x = date, y = value)) +
-  geom_boxplot(outlier.shape = NA) +      
-  geom_jitter(aes(colour = ENVIRONNEMENT),   
-              width = 0.2,
-              alpha = 0.6)
 
 
-l
 
 
 
@@ -210,30 +282,72 @@ l
 
 landmarks |> 
   mutate(
+    m_e = month(DEBUT_EXP),
+    d_e = day(DEBUT_EXP),
+    fake_year_e = if_else((m_e > 8) | (m_e == 8 & d_e >= 15), 2000, 2001),
+    DEBUT_EXP = as.Date(sprintf("%04d-%02d-%02d", fake_year_e, m_e, d_e)),
+    
     m_d = month(DEBUT_CW),
     d_d = day(DEBUT_CW),
     fake_year_d = if_else((m_d > 8) | (m_d == 8 & d_d >= 15), 2000, 2001),
-    date_d = as.Date(sprintf("%04d-%02d-%02d", fake_year_d, m_d, d_d)),
+    DEBUT_CW = as.Date(sprintf("%04d-%02d-%02d", fake_year_d, m_d, d_d)),
+
     m_f = month(FIN_CW),
     d_f = day(FIN_CW),
     fake_year_f = if_else((m_f > 8) | (m_f == 8 & d_f >= 15), 2000, 2001),
-    date_f = as.Date(sprintf("%04d-%02d-%02d", fake_year_f, m_f, d_f)),
-    m_flo = month(FLORAISON),
-    d_flo = day(FLORAISON),
+    FIN_CW = as.Date(sprintf("%04d-%02d-%02d", fake_year_f, m_f, d_f)),
+
+    m_flo = month(DEBUT_FLO),
+    d_flo = day(DEBUT_FLO),
     fake_year_flo = if_else((m_flo > 8) | (m_flo == 8 & d_flo >= 15), 2000, 2001),
-    date_flo = as.Date(sprintf("%04d-%02d-%02d", fake_year_flo, m_flo, d_flo))
+    DEBUT_FLO = as.Date(sprintf("%04d-%02d-%02d", fake_year_flo, m_flo, d_flo)),
+
+    m_ff = month(FIN_FLO),
+    d_ff = day(FIN_FLO),
+    fake_year_ff = if_else((m_ff > 8) | (m_ff == 8 & d_ff >= 15), 2000, 2001),
+    FIN_FLO = as.Date(sprintf("%04d-%02d-%02d", fake_year_ff, m_ff, d_ff)),
+
+    m_fe = month(FIN_EXP),
+    d_fe = day(FIN_EXP),
+    fake_year_fe = if_else((m_fe > 8) | (m_fe == 8 & d_fe >= 15), 2000, 2001),
+    FIN_EXP = as.Date(sprintf("%04d-%02d-%02d", fake_year_fe, m_fe, d_fe)),
   ) |> 
-  select(YEAR, ENVIRONNEMENT, date_d, date_f, date_flo) |> 
-  pivot_longer(c(date_d, date_f, date_flo),
+  select(YEAR, ENVIRONNEMENT, DEBUT_EXP, DEBUT_CW, FIN_CW, DEBUT_FLO, FIN_FLO, FIN_EXP) |> 
+  pivot_longer(c(DEBUT_EXP, DEBUT_CW, FIN_CW, DEBUT_FLO, FIN_FLO, FIN_EXP),
                names_to = "type_date",
-               values_to = "value") |> 
+               values_to = "value") |>  
+  mutate(
+    type_date = factor(type_date, levels = c("DEBUT_EXP", "DEBUT_CW", "FIN_CW", "DEBUT_FLO", "FIN_FLO", "FIN_EXP")))|>
 
   ggplot(aes(x = type_date, y = value)) +
   geom_boxplot(outlier.shape = NA) +      
-  geom_jitter(aes(colour = ENVIRONNEMENT),   
-              width = 0.2,
-              alpha = 0.6) +
+  geom_point(aes(colour = ENVIRONNEMENT), alpha = 0.6) + 
+  geom_line(
+    aes(group = ENVIRONNEMENT, colour = ENVIRONNEMENT), alpha = 0.6
+  ) +
   theme_minimal()
+
+```
+
+
+```{r}
+landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_AU)) + geom_boxplot()
+landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_CW)) + geom_boxplot()
+landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_BO)) + geom_boxplot()
+landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_FLO)) + geom_boxplot()
+landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_P)) + geom_boxplot()
+```
+
+
+```{r}
+
+
+l <- l |> 
+  mutate(DEBUT_CW_n = as.numeric(DEBUT_CW),
+         FIN_CW_n = as.numeric(FIN_CW),
+         FLORAISON_n = as.numeric(FLORAISON))
+
+
 
 ```
 
@@ -244,29 +358,24 @@ landmarks |>
 
 
 
+```{r}
+
+debut_exp <- c()
+for (dt in dts) {
+  debut_exp <- c(debut_exp, dt$DATE[1])
+}
+
+l <- landmarks |> 
+  mutate(FIN_FLO = as.Date(FLORAISON)+21) |> 
+  mutate(DEBUT_EXP = as.Date(debut_exp))
 
 
+library(writexl)
+
+#write_xlsx(l, "data/Date_landmarks_20essais.xlsx")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+```
 
 
 
