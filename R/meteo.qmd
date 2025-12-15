@@ -106,6 +106,8 @@ dts <- list(
   EUR18 = EUR18
 )
 
+dts = dts[order(names(dts))]
+
 dt_meteo <- imap_dfr(dts, ~ mutate(exp = .y, .x))
 names(dt)
 
@@ -132,6 +134,7 @@ rm(INRA11,BGA11,INRA12,INRA13,TI13,EUR14,SYN14,MAD14,RAGT14,TI15,LIM15,SYN15,INR
 ```{r}
 
 graph_TEMP_T_Q <- dt_meteo  |> 
+  #  head(600) |> 
   mutate(
     m = month(DATE),
     d = day(DATE),
@@ -141,7 +144,7 @@ graph_TEMP_T_Q <- dt_meteo  |>
   ggplot(aes(x = date_no_year, y = TEMP_T_Q, color = exp, group = exp)) +
   geom_line() +
   theme_minimal() +
-  labs(x = "Date (sans année)", y = "Valeur") +
+  labs(x = "Date (sans année)", y = "TEMP_T_Q") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_x_date(
     date_labels = "%d-%b",
@@ -158,7 +161,7 @@ graph_E.HYD_PRELIQ <- dt_meteo  |>
   ggplot(aes(x = date_no_year, y = E.HYD_PRELIQ_Q, color = exp, group = exp)) +
   geom_line() +
   theme_minimal() +
-  labs(x = "Date (sans année)", y = "Valeur") +
+  labs(x = "Date (sans année)", y = "E.HYD_PRELIQ_Q") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_x_date(
     date_labels = "%d-%b",
@@ -175,7 +178,7 @@ graph_E.HYD_CUMMUL_P <- dt_meteo  |>
   ggplot(aes(x = date_no_year, y = E.HYD_PRELIQ_Q, color = exp, group = exp)) +
   geom_line() +
   theme_minimal() +
-  labs(x = "Date (sans année)", y = "Valeur") +
+  labs(x = "Date (sans année)", y = "E.HYD_PRELIQ_Q") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_x_date(
     date_labels = "%d-%b",
@@ -192,7 +195,7 @@ graph_E.HYD_ETAT <- dt_meteo  |>
   ggplot(aes(x = date_no_year, y = `E.HYD_ETAT RU_1`, color = exp, group = exp)) +
   geom_line() +
   theme_minimal() +
-  labs(x = "Date (sans année)", y = "Valeur") +
+  labs(x = "Date (sans année)", y = "E.HYD_ETAT RU_1") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_x_date(
     date_labels = "%d-%b",
@@ -209,7 +212,7 @@ graph_RAYO <- dt_meteo  |>
   ggplot(aes(x = date_no_year, y = RAYO_SSI_Q, color = exp, group = exp)) +
   geom_line() +
   theme_minimal() +
-  labs(x = "Date (sans année)", y = "Valeur") +
+  labs(x = "Date (sans année)", y = "RAYO_SSI_Q") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_x_date(
     date_labels = "%d-%b",
@@ -226,7 +229,7 @@ graph_Photoper <- dt_meteo  |>
   ggplot(aes(x = date_no_year, y = Photoperiode, color = exp, group = exp)) +
   geom_line() +
   theme_minimal() +
-  labs(x = "Date (sans année)", y = "Valeur") +
+  labs(x = "Date (sans année)", y = "Photoperiode") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_x_date(
     date_labels = "%d-%b",
@@ -255,7 +258,45 @@ landmarks <- read_excel("data/Date_landmarks_20essais.xlsx") |>
          FIN_CW = as.Date(FIN_CW),
          DEBUT_FLO = as.Date(DEBUT_FLO),
          FIN_FLO = as.Date(FIN_FLO),
-         FIN_EXP = as.Date(FIN_EXP))
+         FIN_EXP = as.Date(FIN_EXP)) |> 
+  mutate(
+    m_e = month(DEBUT_EXP),
+    d_e = day(DEBUT_EXP),
+    fake_year_e = if_else((m_e > 8) | (m_e == 8 & d_e >= 15), 2000, 2001),
+    DEBUT_EXP_s = as.Date(sprintf("%04d-%02d-%02d", fake_year_e, m_e, d_e)),
+    
+    m_d = month(DEBUT_CW),
+    d_d = day(DEBUT_CW),
+    fake_year_d = if_else((m_d > 8) | (m_d == 8 & d_d >= 15), 2000, 2001),
+    DEBUT_CW_s = as.Date(sprintf("%04d-%02d-%02d", fake_year_d, m_d, d_d)),
+    
+    m_f = month(FIN_CW),
+    d_f = day(FIN_CW),
+    fake_year_f = if_else((m_f > 8) | (m_f == 8 & d_f >= 15), 2000, 2001),
+    FIN_CW_s = as.Date(sprintf("%04d-%02d-%02d", fake_year_f, m_f, d_f)),
+    
+    m_flo = month(DEBUT_FLO),
+    d_flo = day(DEBUT_FLO),
+    fake_year_flo = if_else((m_flo > 8) | (m_flo == 8 & d_flo >= 15), 2000, 2001),
+    DEBUT_FLO_s = as.Date(sprintf("%04d-%02d-%02d", fake_year_flo, m_flo, d_flo)),
+    
+    m_ff = month(FIN_FLO),
+    d_ff = day(FIN_FLO),
+    fake_year_ff = if_else((m_ff > 8) | (m_ff == 8 & d_ff >= 15), 2000, 2001),
+    FIN_FLO_s = as.Date(sprintf("%04d-%02d-%02d", fake_year_ff, m_ff, d_ff)),
+    
+    m_fe = month(FIN_EXP),
+    d_fe = day(FIN_EXP),
+    fake_year_fe = if_else((m_fe > 8) | (m_fe == 8 & d_fe >= 15), 2000, 2001),
+    FIN_EXP_s = as.Date(sprintf("%04d-%02d-%02d", fake_year_fe, m_fe, d_fe)),
+  ) |> 
+  select(PARTENAIRE, ENVIRONNEMENT, YEAR,
+         DEBUT_EXP, DEBUT_CW, FIN_CW, DEBUT_FLO, FIN_FLO, FIN_EXP,
+         DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s)
+
+landmark_l <- split(landmarks, landmarks$PARTENAIRE)
+
+landmark_l = landmark_l[order(names(landmark_l))]
 
 
 summary(landmarks)
@@ -284,53 +325,16 @@ A mettre dans l'ordre des saisons
 ```{r}
 
 
-
-
-
-
-
-
-
-
 landmarks |> 
-  mutate(
-    m_e = month(DEBUT_EXP),
-    d_e = day(DEBUT_EXP),
-    fake_year_e = if_else((m_e > 8) | (m_e == 8 & d_e >= 15), 2000, 2001),
-    DEBUT_EXP = as.Date(sprintf("%04d-%02d-%02d", fake_year_e, m_e, d_e)),
-    
-    m_d = month(DEBUT_CW),
-    d_d = day(DEBUT_CW),
-    fake_year_d = if_else((m_d > 8) | (m_d == 8 & d_d >= 15), 2000, 2001),
-    DEBUT_CW = as.Date(sprintf("%04d-%02d-%02d", fake_year_d, m_d, d_d)),
-
-    m_f = month(FIN_CW),
-    d_f = day(FIN_CW),
-    fake_year_f = if_else((m_f > 8) | (m_f == 8 & d_f >= 15), 2000, 2001),
-    FIN_CW = as.Date(sprintf("%04d-%02d-%02d", fake_year_f, m_f, d_f)),
-
-    m_flo = month(DEBUT_FLO),
-    d_flo = day(DEBUT_FLO),
-    fake_year_flo = if_else((m_flo > 8) | (m_flo == 8 & d_flo >= 15), 2000, 2001),
-    DEBUT_FLO = as.Date(sprintf("%04d-%02d-%02d", fake_year_flo, m_flo, d_flo)),
-
-    m_ff = month(FIN_FLO),
-    d_ff = day(FIN_FLO),
-    fake_year_ff = if_else((m_ff > 8) | (m_ff == 8 & d_ff >= 15), 2000, 2001),
-    FIN_FLO = as.Date(sprintf("%04d-%02d-%02d", fake_year_ff, m_ff, d_ff)),
-
-    m_fe = month(FIN_EXP),
-    d_fe = day(FIN_EXP),
-    fake_year_fe = if_else((m_fe > 8) | (m_fe == 8 & d_fe >= 15), 2000, 2001),
-    FIN_EXP = as.Date(sprintf("%04d-%02d-%02d", fake_year_fe, m_fe, d_fe)),
-  ) |> 
-  select(YEAR, ENVIRONNEMENT, DEBUT_EXP, DEBUT_CW, FIN_CW, DEBUT_FLO, FIN_FLO, FIN_EXP) |> 
-  pivot_longer(c(DEBUT_EXP, DEBUT_CW, FIN_CW, DEBUT_FLO, FIN_FLO, FIN_EXP),
+  select(YEAR, ENVIRONNEMENT, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |> 
+  pivot_longer(c(DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s),
                names_to = "type_date",
                values_to = "value") |>  
   mutate(
-    type_date = factor(type_date, levels = c("DEBUT_EXP", "DEBUT_CW", "FIN_CW", "DEBUT_FLO", "FIN_FLO", "FIN_EXP")))|>
-
+    type_date = factor(type_date, 
+                       levels = c("DEBUT_EXP_s", "DEBUT_CW_s", "FIN_CW_s",
+                                  "DEBUT_FLO_s", "FIN_FLO_s", "FIN_EXP_s")))|>
+  
   ggplot(aes(x = type_date, y = value)) +
   geom_boxplot(outlier.shape = NA) +      
   geom_point(aes(colour = ENVIRONNEMENT), alpha = 0.6) + 
@@ -343,48 +347,175 @@ landmarks |>
 
 
 ```{r}
-landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_AU)) + geom_boxplot()
-landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_CW)) + geom_boxplot()
-landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_BO)) + geom_boxplot()
-landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_FLO)) + geom_boxplot()
-landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_P)) + geom_boxplot()
+landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_AU)) + geom_boxplot() + theme_minimal()
+landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_CW)) + geom_boxplot() + theme_minimal()
+landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_BO)) + geom_boxplot() + theme_minimal()
+landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_FLO)) + geom_boxplot() + theme_minimal()
+landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_P)) + geom_boxplot() + theme_minimal()
 ```
 
+
+# Landmark de reference
+```{r}
+
+ref_lm <- landmarks |> 
+  select(DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |> 
+  mutate(across(everything(), as.numeric)) |> 
+  summarise(across(everything(), ~ round(mean(.x)))) |> 
+  as.vector() |> 
+  unlist()
+
+
+as.Date(ref_lm)
+
+```
+as.Date(ref_lm)
+DEBUT_EXP_s   DEBUT_CW_s     FIN_CW_s  DEBUT_FLO_s    FIN_FLO_s    FIN_EXP_s 
+"2000-09-08" "2000-12-08" "2001-02-05" "2001-04-03" "2001-04-24" "2001-06-29" 
+
+
+# création spline 
 
 ```{r}
 
 
-l <- l |> 
-  mutate(DEBUT_CW_n = as.numeric(DEBUT_CW),
-         FIN_CW_n = as.numeric(FIN_CW),
-         FLORAISON_n = as.numeric(FLORAISON))
-
-
-
-```
-
-
-
-
-
-
-
-
-```{r}
-
-debut_exp <- c()
-for (dt in dts) {
-  debut_exp <- c(debut_exp, dt$DATE[1])
+make_bij <- function(lm, ref) {
+  
+  # spline 
+  fun <- splinefun(x = ref, y = lm, method = "monoH.FC")
+  # inverse numérique 
+  f_inv_num <- function(y) {
+    
+    sapply(y, function(y0) {
+      
+      if (y0 < min(lm) || y0 > max(lm)) {
+        return(NA_real_)
+      }
+      
+      uniroot(
+        function(x) fun(x) - y0,
+        interval = range(ref),
+        tol = .Machine$double.eps^0.5
+      )$root
+    })
+  }
+  f_inv_num
 }
 
-l <- landmarks |> 
-  mutate(FIN_FLO = as.Date(FLORAISON)+21) |> 
-  mutate(DEBUT_EXP = as.Date(debut_exp))
+```
 
 
-library(writexl)
 
-#write_xlsx(l, "data/Date_landmarks_20essais.xlsx")
+# 1 spline
+```{r}
+
+l_s <- landmarks_s$BGA11 |> 
+  as.numeric()
+
+sp <- make_bij(lm = l_s, ref = ref_lm)
+
+min <- min(landmarks$DEBUT_EXP_s) |> as.numeric()
+# "2000-08-31"
+max <- max(landmarks$FIN_EXP_s) |> as.numeric()
+# "2001-07-17"
+
+x <- seq(min(l_s), max(l_s), length.out = 20)
+
+values <- round(sp(x))
+
+# plot
+plot(l_s, ref_lm, col = "red", pch = 19, main = "Spline monotone (Fritsch–Carlson)")
+points(x, values, col = "blue", lwd = 2)
+lines(x, values, col = "blue", lwd = 2)
+
+
+
+```
+
+
+
+
+# création des splines 
+```{r}
+
+noms <- landmarks$PARTENAIRE
+
+landmarks_s <- landmarks |> 
+  select(DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |> 
+  split(noms)
+
+splines_l <- mapply(
+  FUN = function(l_s, nm) {
+    l_s <- as.numeric(l_s)
+    make_bij(lm = l_s, ref = ref_lm)
+  },
+  l_s = landmarks_s,
+  nm = names(landmarks_s),
+  SIMPLIFY = FALSE
+)
+
+splines_l <- splines_l[order(names(splines_l))]
+
+
+#######################################"
+
+
+
+
+splines_l <- setNames(vector("list", length(noms)), noms)
+
+for (l_s in landmarks_s){
+  
+  l_s <- l_s |> 
+    as.numeric()
+  
+  sp <- make_bij(lm = l_s, ref = ref_lm)
+  
+  splines_l[name] <- sp
+  
+  x <- seq(min(l_s), max(l_s), length.out = 20)
+  
+  values <- round(sp(x))
+  
+  plot(l_s, ref_lm, col = "red", pch = 19, main = "Spline monotone (Fritsch–Carlson)")
+  points(x, values, col = "blue", lwd = 2)
+  lines(x, values, col = "blue", lwd = 2)
+  
+}
+
+
+
+```
+
+
+appliquer mes splines à mes date en puis faire un round pour prendre la date la plus proche 
+faire attention à ce que les experiences correspondent
+
+ajouter des landmarks très loins avant et après sur la diagonale pour avoir une courbe avant et après les ref
+
+
+
+# Appliquer spline aux dates
+
+```{r}
+
+l_s <- landmarks_s$BGA11 |> as.numeric()
+sp <- splines_l$BGA11
+date <- dts$BGA11 |> 
+  mutate(DATE = as.Date(DATE),
+         m = month(DATE),
+         d = day(DATE),
+         fake_year = if_else((m > 8) | (m == 8 & d >= 15), 2000, 2001),
+         DATE_s = as.Date(sprintf("%04d-%02d-%02d", fake_year, m, d))) |> 
+  select(DATE_s)
+
+
+date <- date |> as.vector() |> unlist()
+
+new_date <- round(sp(date))
+
+dates_on <- data.frame(old = date, new = new_date) |> 
+  mutate(new_date = ifelse(is.na(new_date), date, new_date))
 
 
 ```
