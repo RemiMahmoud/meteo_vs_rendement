@@ -9,7 +9,6 @@ library(tidyverse)
 library(fda)
 library(RColorBrewer)
 library(patchwork)
-library(fda)
 library(FactoMineR)
 require(splines)
 #Pour la régression fonctionnelle:

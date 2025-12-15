@@ -120,8 +120,19 @@ rm(INRA11,BGA11,INRA12,INRA13,TI13,EUR14,SYN14,MAD14,RAGT14,TI15,LIM15,SYN15,INR
 
 ```{r}
 
+library(FactoMineR)
+library(factoextra)
+data_acp <- dt_meteo[ , 2:(ncol(dt_meteo)-1)]
+data_acp <- data_acp[, !names(data_acp) %in% c("TEMP_VAR", "RAYO_VAR", "E.HYD_VAR")]
+rownames(data_acp) <- NULL
 
+acp <- PCA(data_acp, scale.unit = TRUE, graph = TRUE)
 
+#Photopériode proche de rayonnement 
+#Rayonnement corrélé négativement à la précipitation
+#Réserve Utile négativement corrélé à la température
+#Précipitation non corrélé à la température 
+# Température, état RU expliquent bien la variance sur les 2 prmières dimensions
 
 ```
 
