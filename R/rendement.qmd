@@ -180,6 +180,11 @@ fusion data rendement
 ```{r}
 
 data_rendement <- rbind(dt_rendement1415, dt_rend)
+data_rendement$variety[data_rendement$variety == "Aviso"] <- "BRA_008_Aviso"
+data_rendement$variety[data_rendement$variety == "Montego"] <- "R_243_Montego"
+data_rendement$exp[data_rendement$exp == "LE15"] <- "LIM15"
+data_rendement$exp[data_rendement$exp == "R2N14"] <- "RAGT14"
+data_rendement$exp[data_rendement$exp == "R2N15"] <- "RAGT15"
 
 ```
 
