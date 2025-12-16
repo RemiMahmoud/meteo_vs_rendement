@@ -526,5 +526,49 @@ dts_lm <- imap_dfr(dts_lm_l, ~ mutate(exp = .y, .x)) |>
 
 
 
+#plot meteo et landmark avec et sans transformation
+```{r}
+
+land_long <- landmarks |>
+  select(PARTENAIRE, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |>
+  pivot_longer(cols = -PARTENAIRE, names_to = "type", values_to = "date") |>
+  mutate(
+    m = month(date),
+    d = day(date),
+    fake_year = if_else(
+      (m > 8) | (m == 8 & d >= 15), 2000, 2001),
+    date = as.Date(sprintf("%04d-%02d-%02d", fake_year, m, d)))
+
+#graph_TEMP_T_Q <- 
+  
+dt_meteo  |> 
+  head(600) |> 
+  mutate(
+    m = month(DATE),
+    d = day(DATE),
+    fake_year = if_else(
+      (m > 8) | (m == 8 & d >= 15), 2000, 2001),
+    date_no_year = as.Date(sprintf("%04d-%02d-%02d", fake_year, m, d))) |> 
+  ggplot(aes(x = date_no_year, y = TEMP_T_Q, color = exp, group = exp)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date (sans année)", y = "TEMP_T_Q") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_date(
+    date_labels = "%d-%b",
+    limits = as.Date(c("2000-08-15", "2001-08-15"))
+  ) +
+  geom_vline(
+    data = land_long,
+    aes(xintercept = date, color = PARTENAIRE, linetype = type),
+    alpha = 0.7
+  )
+
+
+
+
+```
+
+
 
 
