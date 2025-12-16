@@ -10,6 +10,7 @@ library(tidyverse)
 library(readxl)
 library(lubridate)
 library(FactoMineR)
+library(factoextra)
 ```
 
 
@@ -111,8 +112,9 @@ dts = dts[order(names(dts))]
 dt_meteo <- imap_dfr(dts, ~ mutate(exp = .y, .x))
 names(dt)
 
-rm(INRA11,BGA11,INRA12,INRA13,TI13,EUR14,SYN14,MAD14,RAGT14,TI15,LIM15,SYN15,INRA15,BGA15,RAGT15,MAD15,INRA16,INRA17,INRA18,EUR18)
+rm(INRA11,BGA11,INRA12,INRA13,TI13,EUR14,SYN14,MAD14,RAGT14,TI15,LIM15,SYN15,INRA15,BGA15,RAGT15,MAD15,INRA16,INRA17,INRA18,EUR18, read_meteo)
 
+noms <- names(dts)
 ```
 
 
@@ -120,8 +122,7 @@ rm(INRA11,BGA11,INRA12,INRA13,TI13,EUR14,SYN14,MAD14,RAGT14,TI15,LIM15,SYN15,INR
 
 ```{r}
 
-library(FactoMineR)
-library(factoextra)
+
 data_acp <- dt_meteo[ , 2:(ncol(dt_meteo)-1)]
 data_acp <- data_acp[, !names(data_acp) %in% c("TEMP_VAR", "RAYO_VAR", "E.HYD_VAR")]
 rownames(data_acp) <- NULL
@@ -263,6 +264,7 @@ graph_Photoper        # Durée jour / durée nuit
 
 ```{r}
 
+
 landmarks <- read_excel("data/Date_landmarks_20essais.xlsx") |> 
   mutate(DEBUT_EXP = as.Date(DEBUT_EXP),
          DEBUT_CW = as.Date(DEBUT_CW),
@@ -270,6 +272,11 @@ landmarks <- read_excel("data/Date_landmarks_20essais.xlsx") |>
          DEBUT_FLO = as.Date(DEBUT_FLO),
          FIN_FLO = as.Date(FIN_FLO),
          FIN_EXP = as.Date(FIN_EXP)) |> 
+  mutate(DUREE_AU = as.numeric(DEBUT_CW - DEBUT_EXP),
+         DUREE_CW = as.numeric(FIN_CW - DEBUT_CW),
+         DUREE_BO = as.numeric(DEBUT_FLO - FIN_CW),
+         DUREE_FLO = as.numeric(FIN_FLO - DEBUT_FLO),
+         DUREE_P = as.numeric(FIN_EXP - FIN_FLO)) |> 
   mutate(
     m_e = month(DEBUT_EXP),
     d_e = day(DEBUT_EXP),
@@ -303,11 +310,17 @@ landmarks <- read_excel("data/Date_landmarks_20essais.xlsx") |>
   ) |> 
   select(PARTENAIRE, ENVIRONNEMENT, YEAR,
          DEBUT_EXP, DEBUT_CW, FIN_CW, DEBUT_FLO, FIN_FLO, FIN_EXP,
-         DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s)
+         DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P,
+         DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |> 
+  mutate(ZERO = 0, INF = 20000)
 
-landmark_l <- split(landmarks, landmarks$PARTENAIRE)
+landmarks_l <- split(landmarks, landmarks$PARTENAIRE)
 
-landmark_l = landmark_l[order(names(landmark_l))]
+landmarks_l = landmarks_l[order(names(landmarks_l))]
+
+landmarks_s <- landmarks |> 
+  select(ZERO, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s, INF) |> 
+  split(noms)
 
 
 summary(landmarks)
@@ -370,7 +383,7 @@ landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_P)) + geom_boxplot() + th
 ```{r}
 
 ref_lm <- landmarks |> 
-  select(DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |> 
+  select(ZERO, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s, INF) |> 
   mutate(across(everything(), as.numeric)) |> 
   summarise(across(everything(), ~ round(mean(.x)))) |> 
   as.vector() |> 
@@ -381,8 +394,8 @@ as.Date(ref_lm)
 
 ```
 as.Date(ref_lm)
-DEBUT_EXP_s   DEBUT_CW_s     FIN_CW_s  DEBUT_FLO_s    FIN_FLO_s    FIN_EXP_s 
-"2000-09-08" "2000-12-08" "2001-02-05" "2001-04-03" "2001-04-24" "2001-06-29" 
+ZERO  DEBUT_EXP_s   DEBUT_CW_s     FIN_CW_s  DEBUT_FLO_s    FIN_FLO_s    FIN_EXP_s          INF 
+"1970-01-01" "2000-09-23" "2000-12-08" "2001-02-05" "2001-04-03" "2001-04-24" "2001-06-29" "2024-10-04" 
 
 
 # création spline 
@@ -390,16 +403,36 @@ DEBUT_EXP_s   DEBUT_CW_s     FIN_CW_s  DEBUT_FLO_s    FIN_FLO_s    FIN_EXP_s
 ```{r}
 
 
-make_bij <- function(lm, ref) {
+make_bij_lm_ref <- function(lm, ref) {
   
   # spline 
-  fun <- splinefun(x = ref, y = lm, method = "monoH.FC")
+  fun <- splinefun(x = lm, y = ref, method = "monoH.FC")
+  
+  fun
+}
+
+
+
+```
+
+
+```{r}
+
+
+make_bij_ref_lm <- function(lm, ref) {
+  
+  fun <- make_bij_lm_ref(lm, ref)
+  
   # inverse numérique 
   f_inv_num <- function(y) {
     
     sapply(y, function(y0) {
       
-      if (y0 < min(lm) || y0 > max(lm)) {
+      
+      f_min <- fun(min(ref)) - y0
+      f_max <- fun(max(ref)) - y0
+      
+      if (is.na(f_min) || is.na(f_max) || f_min * f_max > 0) {
         return(NA_real_)
       }
       
@@ -413,31 +446,6 @@ make_bij <- function(lm, ref) {
   f_inv_num
 }
 
-```
-
-
-
-# 1 spline
-```{r}
-
-l_s <- landmarks_s$BGA11 |> 
-  as.numeric()
-
-sp <- make_bij(lm = l_s, ref = ref_lm)
-
-min <- min(landmarks$DEBUT_EXP_s) |> as.numeric()
-# "2000-08-31"
-max <- max(landmarks$FIN_EXP_s) |> as.numeric()
-# "2001-07-17"
-
-x <- seq(min(l_s), max(l_s), length.out = 20)
-
-values <- round(sp(x))
-
-# plot
-plot(l_s, ref_lm, col = "red", pch = 19, main = "Spline monotone (Fritsch–Carlson)")
-points(x, values, col = "blue", lwd = 2)
-lines(x, values, col = "blue", lwd = 2)
 
 
 
@@ -446,19 +454,16 @@ lines(x, values, col = "blue", lwd = 2)
 
 
 
-# création des splines 
+
+
+# création des splines de ref à lm
 ```{r}
 
-noms <- landmarks$PARTENAIRE
-
-landmarks_s <- landmarks |> 
-  select(DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |> 
-  split(noms)
 
 splines_l <- mapply(
   FUN = function(l_s, nm) {
     l_s <- as.numeric(l_s)
-    make_bij(lm = l_s, ref = ref_lm)
+    make_bij_ref_lm(lm = l_s, ref = ref_lm)
   },
   l_s = landmarks_s,
   nm = names(landmarks_s),
@@ -466,34 +471,6 @@ splines_l <- mapply(
 )
 
 splines_l <- splines_l[order(names(splines_l))]
-
-
-#######################################"
-
-
-
-
-splines_l <- setNames(vector("list", length(noms)), noms)
-
-for (l_s in landmarks_s){
-  
-  l_s <- l_s |> 
-    as.numeric()
-  
-  sp <- make_bij(lm = l_s, ref = ref_lm)
-  
-  splines_l[name] <- sp
-  
-  x <- seq(min(l_s), max(l_s), length.out = 20)
-  
-  values <- round(sp(x))
-  
-  plot(l_s, ref_lm, col = "red", pch = 19, main = "Spline monotone (Fritsch–Carlson)")
-  points(x, values, col = "blue", lwd = 2)
-  lines(x, values, col = "blue", lwd = 2)
-  
-}
-
 
 
 ```
@@ -506,30 +483,47 @@ ajouter des landmarks très loins avant et après sur la diagonale pour avoir un
 
 
 
-# Appliquer spline aux dates
 
+# création d'une liste avec les jeux de données standardisé pour les landmarks
 ```{r}
 
-l_s <- landmarks_s$BGA11 |> as.numeric()
-sp <- splines_l$BGA11
-date <- dts$BGA11 |> 
-  mutate(DATE = as.Date(DATE),
-         m = month(DATE),
-         d = day(DATE),
-         fake_year = if_else((m > 8) | (m == 8 & d >= 15), 2000, 2001),
-         DATE_s = as.Date(sprintf("%04d-%02d-%02d", fake_year, m, d))) |> 
-  select(DATE_s)
+dts_lm_l <- vector("list", length(dts))
+names(dts_lm_l) <- noms
 
+for (name in names(dts)){
+  
+  l_s <- landmarks_s[[name]] |> as.numeric()
+  sp <- splines_l[[name]]
+  
+  date <- ref_lm[2]:ref_lm[7]
+  new_date <- round(sp(date))
+  
+  dates_on <- data.frame(old = date, new = new_date) |> 
+    mutate(new_date = ifelse(is.na(new_date), date, new_date))
+  
+  dt <- dts[[name]] |> 
+    mutate(
+      m = month(DATE),
+      d = day(DATE),
+      fake_year = if_else(
+        (m > 8) | (m == 8 & d >= 15), 2000, 2001),
+      date_no_year = as.Date(sprintf("%04d-%02d-%02d", fake_year, m, d)),
+      new = as.numeric(date_no_year)) |> 
+    select(-c(m, d, fake_year))
+  
+  dt <- dates_on |> 
+    left_join(dt)
+  
+  dts_lm_l[[name]] <- dt
+}
 
-date <- date |> as.vector() |> unlist()
-
-new_date <- round(sp(date))
-
-dates_on <- data.frame(old = date, new = new_date) |> 
-  mutate(new_date = ifelse(is.na(new_date), date, new_date))
+dts_lm <- imap_dfr(dts_lm_l, ~ mutate(exp = .y, .x)) |> 
+  relocate(exp, .before = 1)
+  
 
 
 ```
+
 
 
 
