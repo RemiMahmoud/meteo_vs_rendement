@@ -206,6 +206,7 @@ ggplot(data_rendement, aes("", value)) +
   )
 
 # EUR18 valeurs extrêmes pour SN
+# INRA 18 et BGA 11 valeurs extrêmes pour TSW
 
 ```
 
