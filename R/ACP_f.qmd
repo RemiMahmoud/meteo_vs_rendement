@@ -32,7 +32,7 @@ data_var <- meteo_lm |>
   column_to_rownames("exp") |> 
   as.matrix()
 
-data_var <- data_var[, 1:200]
+data_var <- data_var[, 1:200] #On restreint la série sur les 200 premières valeurs
 
 time <- as.numeric(colnames(data_var))
 fdParobj <- fdPar(basisobj, lambda = 1e-6)
@@ -45,7 +45,7 @@ fdsmooth <- smooth.basis(
 
 
 fdobj <- fdsmooth$fd
-plot(fdobj)
+plot(fdobj) #Attention, EUR 18, INRA 16, INRA 17 et INRA 18 30 coefficients des fonctions Bsplines indisponibles 
 
 ```
 
@@ -110,11 +110,6 @@ for (e in exps) {
       aes(time, TEMP_T_Q),
       alpha = 0.6
     ) +
-    geom_point(
-      data = df_raw |> filter(exp == e),
-      aes(time, TEMP_T_Q),
-      alpha = 0.6
-    ) +
     geom_line(
       data = df_smooth_long |> filter(exp == e),
       aes(time, TEMP_T_Q),
@@ -127,6 +122,9 @@ for (e in exps) {
   print(p)
 }
 
+#points noirs --> données brures
+#courbe rouge --> fonction lissée$
+#Comparer les mesures observées à la reconstuction fonctionnelle
 
 ```
 
