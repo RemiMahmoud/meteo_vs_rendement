@@ -1,0 +1,161 @@
+---
+title: "ACP_f"
+format: html
+---
+
+```{r library}
+library(tidyverse)
+library(fda)
+```
+
+```{r data}
+meteo_lm <- read.csv("data/meteo_lm")
+glimpse(meteo_lm)
+
+```
+
+
+```{r premiere_ACP}
+#| echo: false
+#| eval: false
+
+
+rangeval <- c(min(meteo_lm$old[1:200]), max(meteo_lm$old[1:200])) # définition de l'échelle (les longueurs d'ondes)
+nbasis <- 30 # Nombre de splines utilisées
+basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis) # création d'une base d'objet
+
+
+data_var <- meteo_lm |> 
+  dplyr::select(exp, old, E.HYD_ETAT.RU_1) |> 
+  mutate(old = as.numeric(old)) |> 
+  pivot_wider(names_from = old, values_from = E.HYD_ETAT.RU_1) |> 
+  column_to_rownames("exp") |> 
+  as.matrix()
+
+data_var <- data_var[, 1:200]
+
+time <- as.numeric(colnames(data_var))
+fdParobj <- fdPar(basisobj, lambda = 1e-6)
+
+fdsmooth <- smooth.basis(
+  argvals  = time,
+  y        = t(data_var),  # smooth.basis attend temps × individus
+  fdParobj = fdParobj
+)
+
+
+fdobj <- fdsmooth$fd
+plot(fdobj)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+data_var
+time
+
+
+time_fine <- seq(min(time), max(time), length.out = 200)
+
+# valeurs lissées
+smooth_values <- eval.fd(time_fine, fdobj)
+
+####################################
+
+df_smooth <- as.data.frame(smooth_values)
+df_smooth$time <- time_fine
+
+df_smooth_long <- df_smooth |>
+  pivot_longer(
+    -time,
+    names_to = "exp",
+    values_to = "TEMP_T_Q"
+  )
+
+#################
+
+df_raw <- data_var |>
+  as.data.frame() |>
+  rownames_to_column("exp") |>
+  pivot_longer(
+    -exp,
+    names_to = "time",
+    values_to = "TEMP_T_Q"
+  ) |>
+  mutate(time = as.numeric(time))
+
+######################
+
+
+
+exps <- unique(df_raw$exp)
+
+for (e in exps) {
+  p <- ggplot() +
+    geom_point(
+      data = df_raw |> filter(exp == e),
+      aes(time, TEMP_T_Q),
+      alpha = 0.6
+    ) +
+    geom_point(
+      data = df_raw |> filter(exp == e),
+      aes(time, TEMP_T_Q),
+      alpha = 0.6
+    ) +
+    geom_line(
+      data = df_smooth_long |> filter(exp == e),
+      aes(time, TEMP_T_Q),
+      color = "red",
+      linewidth = 1
+    ) +
+    theme_minimal() +
+    labs(title = paste("exp =", e))
+  
+  print(p)
+}
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r ACP fonctionnelle}
+
+res.fpca <- pca.fd(fdobj)
+plot.pca.fd(res.fpca)
+```
+
