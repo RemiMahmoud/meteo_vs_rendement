@@ -242,6 +242,12 @@ pca$harmonics
 ```
 
 
+On a ce qui suit en pourcentage d'explication
+```{r}
+pca$varprop
+```
+
+
 ```{r}
 
 scores <- as.data.frame(pca$scores)
@@ -260,21 +266,33 @@ Peux etre faire une droite pour l'axe 1 et un plan pour 2 et 3
 
 ```{r}
 
-plot(pca$harmonics[1] + pca$harmonics[2],
+plot(pca$harmonics[1],
      main = "Première composante principale fonctionnelle",
      xlab = "Temps",
      ylab = "Valeur")
 
+
+plot(pca$harmonics[2],
+     main = "Deuxième composante principale fonctionnelle",
+     xlab = "Temps",
+     ylab = "Valeur")  #sec fin
+
+plot(pca$harmonics[3],
+     main = "Troisième composante principale fonctionnelle",
+     xlab = "Temps",
+     ylab = "Valeur") # Humide début mais sec fin
 ```
 
 
-On a ce qui suit en pourcentage d'explication
-```{r}
-pca$varprop
-```
 
 
+Plot inra11 vrai et approx h1, h2, h3
 
+plot landmark avec zone entre
+
+plot rendement
+
+Fonction qui prends tout en compte (espèce, type rendement, variable d'interet)
 
 
 
