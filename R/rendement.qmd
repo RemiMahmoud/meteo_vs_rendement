@@ -190,6 +190,9 @@ data_rendement$exp[data_rendement$exp == "R2N15"] <- "RAGT15"
 
 ```
 
+```{r}
+#write.csv(data_rendement, "C:/Users/ADMIN.RDS-PRET-0218/Desktop/Agrocampus Ouest/M2/Projet ingénieur/meteo_vs_rendement/rendement.csv")
+```
 
 
 ```{r}
