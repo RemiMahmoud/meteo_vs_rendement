@@ -100,13 +100,15 @@ rend_BGA11 <- read_rend("data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.1_20
 rend_INRA12 <- read_rend("data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.2_2011-2012_G/Ephesis LR12AM.xlsx")
 
 rend_INRA13 <- read_rend("data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.3_2012-2013_G/Ephesis LR13AM.xlsx")
+#Pour INRA13 on a accès au SY mais faire la moyenne
 rend_TI13 <- read_rend("data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.3_2012-2013_G/Ephesis Dij13AM.xlsx")
+#Pour TI13 on a pas accès au SY mais on a accès au SY normalized
 
 rend_INRA16 <- read_rend("data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.6_2015-2016_RWP3_RWP4/170705_Ephesis Le Rheu 2016.xlsx")
 
 rend_INRA17 <- # pas de data rendement
   
-  rend_INRA18 <- read.xlsx(xlsxFile = "data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.8_2017-2018_RWP2_RWP4/LR_2018/Rendements SY Aviso_Montego Canopy A.xlsx",
+rend_INRA18 <- read.xlsx(xlsxFile = "data/1.1.1_Fichiers Ephesis GENERGY-RAPSODYN/1.1.1.8_2017-2018_RWP2_RWP4/LR_2018/Rendements SY Aviso_Montego Canopy A.xlsx",
                            fillMergedCells = TRUE,
                            colNames = TRUE,
                            startRow = 2,
@@ -192,15 +194,19 @@ data_rendement$exp[data_rendement$exp == "R2N15"] <- "RAGT15"
 
 ```{r}
 
-ggplot(dt_rendement, aes("", value)) +
+ggplot(data_rendement, aes("", value)) +
   geom_boxplot() +
   geom_jitter(width = 0.2, alpha = 0.5) +
-  facet_grid(type ~ variety, scales = "free_y") + 
+  facet_grid(type ~ variety, scales = "free_y") +
+  scale_y_continuous(labels = scales::label_number()) +
   theme_classic() + 
   labs(
     x = "",
     y = ""
   )
+
+# EUR18 valeurs extrêmes pour SN
+# INRA 18 et BGA 11 valeurs extrêmes pour TSW
 
 ```
 

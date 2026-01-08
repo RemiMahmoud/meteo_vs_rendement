@@ -11,6 +11,7 @@ library(tidyr)
 library(dplyr)
 library(ggplot2)
 
+#meteo.qmd --> dt_meteo
 
 dt_acpf <- dt_meteo  |> 
   mutate(
@@ -57,7 +58,7 @@ matplot(
 
 jours <- as.numeric(names(num_cols_clean))
 rangeval <- c(min(jours), max(jours)) 
-nbasis <- 50 # Nombre de splines utilisées, superposer les approximations et nombre de plines  
+nbasis <- 30 # Nombre de splines utilisées, superposer les approximations et nombre de plines  
 basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis) # création d'une base d'objet
 
 # convertir les données discrètes en fd (estimation par régression sur la base)
@@ -66,9 +67,9 @@ fdsmooth <- smooth.basis(argvals = jours, y = t(as.matrix(num_cols_clean)), fdPa
 
 fdobj <- fdsmooth$fd
 
-# ACP fonctionnelle avec lissage medium
-res.fpca <- pca.fd(fdobj, harmfdPar = fdPar(fdobj = fdobj, lambda = 10))
-plot.pca.fd(res.fpca, pointplot = F)
+# ACP fonctionnelle avec lissage medium, on peut avoir au maximum 20 variables
+res.fpca <- pca.fd(fdobj, nharm = 5, harmfdPar = fdPar(fdobj = fdobj, lambda = 10))
+plot.pca.fd(res.fpca, pointplot = FALSE)
 
 res.fpca$harmonics$coefs
 #Les harmoniques sont les dimensions. Une harmonique = une fonction
@@ -93,7 +94,9 @@ ggplot(rendement %>% filter(type == "SY", variety == "BRA_008_Aviso"),
   geom_point(alpha = 0.7) +
   geom_text(size = 5, vjust = -0.5) +
   scale_size_continuous(range = c(1, 10)) +
-  labs(title = "Nuage des individus – ACP fonctionnelle", size = "Rendement SY")
+  labs(title = "Nuage des individus – ACP fonctionnelle", size = "Rendement SY") +
+  geom_hline(yintercept = 0, linewidth = 0.4) +
+  geom_vline(xintercept = 0, linewidth = 0.4)
 
 
 # On essaye de lisser les courbes pour lisser les tendances
