@@ -160,6 +160,7 @@ ref_lm <- landmarks |>
   as.vector() |> 
   unlist()
 
+# write.csv(ref_lm, "C:/Users/louis/OneDrive/Bureau/Cours/M2/meteo_vs_rendement/data/ref_lm.csv")
 
 as.Date(ref_lm)
 
