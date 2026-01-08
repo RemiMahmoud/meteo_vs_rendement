@@ -31,7 +31,9 @@ noms <- c("INRA11","BGA11",
 ```{r}
 
 
-landmarks <- read_excel("data/Date_landmark.xlsx") |> 
+landmarks <- read_excel("data/Date_landmark.xlsx")  |>
+  mutate(PARTENAIRE = as.character(PARTENAIRE)) |>
+  arrange(match(PARTENAIRE, noms)) |> 
   mutate(DEBUT_EXP = as.Date(DEBUT_EXP),
          DEBUT_CW = as.Date(DEBUT_CW),
          FIN_CW = as.Date(FIN_CW),
@@ -81,15 +83,9 @@ landmarks <- read_excel("data/Date_landmark.xlsx") |>
   mutate(ZERO = 0, INF = 20000)
 
 
-#suppr landmarks_l ?
-landmarks_l <- split(landmarks, landmarks$PARTENAIRE)
-
-landmarks_l = landmarks_l[order(names(landmarks_l))]
-
 landmarks_s <- landmarks |> 
   select(ZERO, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s, INF) |> 
   split(noms)
-
 
 summary(landmarks)
 
@@ -178,6 +174,8 @@ ZERO  DEBUT_EXP_s   DEBUT_CW_s     FIN_CW_s  DEBUT_FLO_s    FIN_FLO_s    FIN_EXP
 Regarder la météo
 ```{r}
 
+link <- "data/climate_data/indicateurs_journaliers_par_essais/1.1.4.2.5_R2015/191022_SYN15_IPC_Calcul_ok.xlsx"
+
 read_meteo <- function(link){
   data <- read_excel(link, col_names = FALSE) |> 
     mutate_all(as.character) |> 
@@ -203,7 +201,7 @@ read_meteo <- function(link){
   data <- data |> 
     filter(! is.na(DATE))
   
-  data <- data[, -c(1:2)]  # 2 ->3
+  data <- data[, -c(1:2)] 
   
   data <- data |> mutate_all(as.numeric)
   data <- data |> mutate(DATE = as_date(DATE, origin = "1899-12-30"))
@@ -503,7 +501,7 @@ dts_lm_l <- vector("list", length(dts))
 names(dts_lm_l) <- noms
 
 
-name <- "BGA11"
+name <- "SYN15"
 
 for (name in names(dts)){
   
@@ -516,7 +514,8 @@ for (name in names(dts)){
   dates_on <- data.frame(date_ref = date, DATE_s_n = new_date)
   
   dt <- dts[[name]] |> 
-    mutate(DATE_s_n = as.numeric(DATE_s))
+    mutate(DATE_s_n = as.numeric(DATE_s)) |> 
+    relocate(DATE, DATE_s, DATE_s_n, .before = everything())
   
   dt <- dates_on |> 
     left_join(dt)
@@ -525,7 +524,7 @@ for (name in names(dts)){
   
   
   plot(date, new_date, type = "l")  # traits entre les points
-  
+  title(name)
   points(ref_lm[2:7],
          landmarks_s[[name]][2:7],
          col = "red",
@@ -541,53 +540,10 @@ dts_lm <- imap_dfr(dts_lm_l, ~ mutate(exp = .y, .x)) |>
 
 summary(dts_lm)
 
+dts_lm$exp[which(is.na(dts_lm$DATE))]
+# problème avec INRA11 et SYN15
 
 ```
-
-
-
-# test 
-
-```{r}
-
-
-dts_lm |>
-  group_by(exp) |>
-  summarise(n_NA = sum(is.na(E.HYD_WSC)), .groups = "drop") |>
-  filter(n_NA > 0)
-
-##################
-
-as.numeric(landmarks_s$INRA12)[2:7]
-splines_l$INRA12(ref_lm[2:7])
-ref_lm[2:7]
-round(splines_l$INRA12(ref_lm[2]:ref_lm[7]))
-
-###########################
-
-as.numeric(landmarks_s$INRA11)[2:7]
-splines_l$INRA11(ref_lm[2:7])
-ref_lm[2:7]
-round(splines_l$INRA11(ref_lm[2]:ref_lm[7]))
-
-###########################
-
-dts_lm_l$INRA11$DATE_s_n
-
-as.numeric(landmarks_s$BGA11)[2:7]
-splines_l$BGA11(ref_lm[2:7])
-ref_lm[2:7]
-
-
-view(dts_lm_l$BGA11)
-```
-
-# A tibble: 3 × 2
-exp     n_NA
-<chr>  <int>
-1 BGA11     14
-2 BGA15     11
-3 INRA15     1
 
 
 
