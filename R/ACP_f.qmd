@@ -25,7 +25,7 @@ rendement <- read.csv("data/rendement.csv") |>
 ```
 
 
-```{r}
+```{r noms}
 noms <- c("INRA11","BGA11",
           "INRA12",
           "INRA13","TI13",
@@ -37,13 +37,11 @@ noms <- c("INRA11","BGA11",
 ```
 
 
-
-#fonction crea data pour acp f
 ```{r fonction crea data pour acp f}
 
-data_acp_f <- function(var, centre = FALSE, plot = TRUE){
+data_acp_f <- function(var, centre = FALSE, plot = TRUE, nbspines = 30){
   rangeval <- c(min(meteo_lm$date_ref), max(meteo_lm$date_ref)) # définition de l'échelle (les longueurs d'ondes)
-  nbasis <- 30 # Nombre de splines utilisées
+  nbasis <- nbspines # Nombre de splines utilisées
   basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis) # création d'une base d'objet
   
   
@@ -87,6 +85,116 @@ fdobj <- data_acp_f(E.HYD_WSC, centre = F, plot = T)
 ```
 
 
+```{r plot_harmonique}
+
+plot_harmonique <- function(acpf, i){
+  fd_eval <- eval.fd(seq(11219, 11502, length.out = 100), acpf$harmonics[i])
+  
+  ylim <- range(fd_eval)
+  num <- c("Première", "Deuxième", "Troisième", "Quatrième", "Cinquième")
+  
+  plot(acpf$harmonics[i],
+       main = paste(num[i], "composante principale fonctionnelle"),
+       xlab = "Temps",
+       ylab = "Valeur")  # humidité generale
+  rect(ref_lm_v[-length(ref_lm_v)],  # xleft
+       ylim[1],                # ybottom
+       ref_lm_v[-1],               # xright
+       ylim[2],                # ytop
+       col = c(
+         rgb(1, 0, 0, 0.15),
+         rgb(0, 1, 0, 0.15),
+         rgb(0, 0, 1, 0.15)
+       ),
+       border = NA)
+  
+  y_text <- ylim[1] + 0.05 * diff(ylim)
+  
+  text(ref_lm_v, y_text,
+       labels = periode_clim,
+       cex = 0.9, srt = 90,
+       xpd = TRUE)
+}
+
+plot_harmonique(acpf, 1)  #humidité moyenne
+plot_harmonique(acpf, 2)  #sec fin
+plot_harmonique(acpf, 3)  # Humide début mais sec fin
+
+```
+
+
+```{r plot_indiv}
+
+plot_indiv <- function(acpf, type_rend = "SY", var = "Aviso", axe = c(1, 2), variable){
+  
+    V <- paste0("V" ,axe)
+    
+    scores <- as.data.frame(acpf$scores)
+    scores$exp <- noms
+    scores <- scores |> 
+      left_join(rendement |> 
+              filter(type == type_rend,
+                     variety == var))
+  
+  if(length(axe) == 2){
+
+    scores |> 
+      ggplot(aes(x = .data[[V[1]]], y = .data[[V[2]]])) +
+      geom_point(aes(color = exp, size = value)) +  
+      geom_text(aes(label = exp), vjust = -1) +  # nom des sites au-dessus
+      theme_minimal() +
+      labs(x = paste0("Dimension ", axe[1], " : ", round(acpf$varprop[axe[1]], 2)*100, "%"),
+           y = paste0("Dimension ", axe[2], " : ", round(acpf$varprop[axe[2]], 2)*100, "%"),
+           title = paste0("Le rendement ", type_rend, " sur le plan de l'ACP (axes ", axe[1], " et ", axe[2], ") avec la variable ", as.character(variable)))
+    
+  }else if(length(axe) == 1){
+    
+        scores |> 
+      ggplot(aes(x = .data[[V[1]]], y = 0)) +
+      geom_point(aes(color = exp, size = value)) +  
+      geom_text(aes(label = exp), vjust = -1) +  # nom des sites au-dessus
+      theme_minimal() +
+      labs(x = paste0("Dimension ", axe[1], " : ", round(acpf$varprop[axe[1]], 2)*100, "%"),
+           y = "",
+           title = paste0("Le rendement ", type_rend, " sur l'axe de l'ACP (axe ", axe[1], ") avec la variable ", as.character(variable)))
+    
+  }
+}
+
+plot_indiv(pca,
+           type_rend = "SY",
+           var = "Montego",
+           axe = c(1, 2),
+           variable = "")
+
+```
+
+
+```{r fun_acpf}
+fun_acpf <- function(variable,
+                     centre = F, plot = T, nbspines = 30,
+                     nharm = 5,
+                     type_rend = "SY", var = "Aviso", axe = c(1, 2)){
+  
+  fdobj <- data_acp_f({{variable}}, centre = centre, plot = plot, nbspines = nbspines)  # crea data (spline)
+  acpf <- pca.fd(fdobj, nharm = nharm)                          # pca fun
+  print("Le pourcentage d'explication de chaque axe de l'acpf est :")
+  print(round(acpf$varprop, 3) * 100)
+  # plot fonction moyenne
+  plot(mean.fd(fdobj))
+  plot_harmonique(acpf, 1)   
+  plot_harmonique(acpf, 2)
+  plot_harmonique(acpf, 3)
+  plot_harmonique(acpf, 4)
+  plot_harmonique(acpf, 5)
+  plot_indiv(acpf, type_rend = type_rend, var = var, axe = c(1, 2), variable = variable)
+}
+
+fun_acpf("TEMP_T_Q", nbspines = 10)
+
+
+```
+
 
 
 
@@ -116,86 +224,17 @@ pca$varprop
 ```
 
 
-```{r}
-
-plot_indiv <- function(acpf, type_rend = "SY", var = "Aviso", axe = c(1, 2), variable){
-  
-    V <- paste0("V" ,axe)
-    
-    scores <- as.data.frame(pca$scores)
-    scores$exp <- noms
-    scores <- scores |> 
-      left_join(rendement |> 
-              filter(type == type_rend,
-                     variety == var))
-  
-  if(length(axe) == 2){
-
-    scores |> 
-      ggplot(aes(x = .data[[V[1]]], y = .data[[V[2]]])) +
-      geom_point(aes(color = exp, size = value)) +  
-      geom_text(aes(label = exp), vjust = -1) +  # nom des sites au-dessus
-      theme_minimal() +
-      labs(x = paste0("Dimension ", axe[1], " : ", round(pca$varprop[axe[1]], 2)*100, "%"),
-           y = paste0("Dimension ", axe[2], " : ", round(pca$varprop[axe[2]], 2)*100, "%"),
-           title = paste0("Le rendement ", type_rend, " sur le plan de l'ACP (axes ", axe[1], " et ", axe[2], ") avec la variable", as.character(variable)))
-    
-  }else if(length(axe) == 1){
-    
-        scores |> 
-      ggplot(aes(x = .data[[V[1]]], y = 0)) +
-      geom_point(aes(color = exp, size = value)) +  
-      geom_text(aes(label = exp), vjust = -1) +  # nom des sites au-dessus
-      theme_minimal() +
-      labs(x = paste0("Dimension ", axe[1], " : ", round(pca$varprop[axe[1]], 2)*100, "%"),
-           y = "",
-           title = paste0("Le rendement ", type_rend, " sur l'axe de l'ACP (axe ", axe[1], ") avec la variable", as.character(variable)))
-    
-  }
-}
-
-plot_indiv(pca,
-           type_rend = "SY",
-           var = "Montego",
-           axe = c(1, 2),
-           variable = "")
-
-```
-Peux etre faire une droite pour l'axe 1 et un plan pour 2 et 3
-
-si 3 à plus de 25% de 1 et 2 + 3 a plus que 1
 
 
+```{r plot_harmonique}
 
-```{r}
-df_diff <- rendement %>%
-  pivot_wider(
-    names_from  = variety,
-    values_from = value
-  ) %>%
-  mutate(diff = Aviso - Montego) |> 
-  dplyr::filter(type == "TSW")
-```
-
-
-
-
-
-
-
-
-```{r}
-
-plot_harmonique <- function(i){
-  fd_eval <- eval.fd(seq(min(fdobj$basis$rangeval),
-                         max(fdobj$basis$rangeval),
-                         length.out = 100),
-                     pca$harmonics[i])
+plot_harmonique <- function(acpf, i){
+  fd_eval <- eval.fd(seq(11219, 11502, length.out = 100), acpf$harmonics[i])
   
   ylim <- range(fd_eval)
   num <- c("Première", "Deuxième", "Troisième", "Quatrième", "Cinquième")
   
-  plot(pca$harmonics[i],
+  plot(acpf$harmonics[i],
        main = paste(num[i], "composante principale fonctionnelle"),
        xlab = "Temps",
        ylab = "Valeur")  # humidité generale
@@ -218,11 +257,102 @@ plot_harmonique <- function(i){
        xpd = TRUE)
 }
 
-plot_harmonique(1)  #humidité moyenne
-plot_harmonique(2)  #sec fin
-plot_harmonique(3)  # Humide début mais sec fin
+plot_harmonique(acpf, 1)  #humidité moyenne
+plot_harmonique(acpf, 2)  #sec fin
+plot_harmonique(acpf, 3)  # Humide début mais sec fin
 
 ```
+
+
+```{r plot_indiv}
+
+plot_indiv <- function(acpf, type_rend = "SY", var = "Aviso", axe = c(1, 2), variable){
+  
+    V <- paste0("V" ,axe)
+    
+    scores <- as.data.frame(acpf$scores)
+    scores$exp <- noms
+    scores <- scores |> 
+      left_join(rendement |> 
+              filter(type == type_rend,
+                     variety == var))
+  
+  if(length(axe) == 2){
+
+    scores |> 
+      ggplot(aes(x = .data[[V[1]]], y = .data[[V[2]]])) +
+      geom_point(aes(color = exp, size = value)) +  
+      geom_text(aes(label = exp), vjust = -1) +  # nom des sites au-dessus
+      theme_minimal() +
+      labs(x = paste0("Dimension ", axe[1], " : ", round(acpf$varprop[axe[1]], 2)*100, "%"),
+           y = paste0("Dimension ", axe[2], " : ", round(acpf$varprop[axe[2]], 2)*100, "%"),
+           title = paste0("Le rendement ", type_rend, " sur le plan de l'ACP (axes ", axe[1], " et ", axe[2], ") avec la variable ", as.character(variable)))
+    
+  }else if(length(axe) == 1){
+    
+        scores |> 
+      ggplot(aes(x = .data[[V[1]]], y = 0)) +
+      geom_point(aes(color = exp, size = value)) +  
+      geom_text(aes(label = exp), vjust = -1) +  # nom des sites au-dessus
+      theme_minimal() +
+      labs(x = paste0("Dimension ", axe[1], " : ", round(acpf$varprop[axe[1]], 2)*100, "%"),
+           y = "",
+           title = paste0("Le rendement ", type_rend, " sur l'axe de l'ACP (axe ", axe[1], ") avec la variable ", as.character(variable)))
+    
+  }
+}
+
+plot_indiv(pca,
+           type_rend = "SY",
+           var = "Montego",
+           axe = c(1, 2),
+           variable = "")
+
+```
+
+Peux etre faire une droite pour l'axe 1 et un plan pour 2 et 3
+
+si 3 à plus de 25% de 1 et 2 + 3 a plus que 1
+
+
+```{r fun_acpf}
+fun_acpf <- function(variable,
+                     centre = F, plot = T, nbspines = 30,
+                     nharm = 5,
+                     type_rend = "SY", var = "Aviso", axe = c(1, 2)){
+  
+  fdobj <- data_acp_f({{variable}}, centre = centre, plot = plot, nbspines = nbspines)  # crea data (spline)
+  acpf <- pca.fd(fdobj, nharm = nharm)                          # pca fun
+  print("Le pourcentage d'explication de chaque axe de l'acpf est :")
+  print(round(acpf$varprop, 3) * 100)
+  # plot fonction moyenne
+  plot(mean.fd(fdobj))
+  plot_harmonique(acpf, 1)   
+  plot_harmonique(acpf, 2)
+  plot_harmonique(acpf, 3)
+  plot_harmonique(acpf, 4)
+  plot_harmonique(acpf, 5)
+  plot_indiv(acpf, type_rend = type_rend, var = var, axe = c(1, 2), variable = variable)
+}
+
+fun_acpf("TEMP_T_Q", nbspines = 10)
+
+
+```
+
+
+
+Plot inra11 vrai et approx h1, h2, h3   oui 
+
+plot landmark avec zone entre           oui
+
+plot rendement                          oui
+
+plot propre
+
+Fonction qui prends tout en compte (espèce, type rendement, variable d'interet)  oui 
+
+
 
 
 # reconstruire la courbe à partire des harmoniques
@@ -248,19 +378,6 @@ plot(fdobj[i],
 
 
 ```
-
-
-
-Plot inra11 vrai et approx h1, h2, h3   oui 
-
-plot landmark avec zone entre           oui
-
-plot rendement                          oui
-
-plot propre
-
-Fonction qui prends tout en compte (espèce, type rendement, variable d'interet)
-
 
 
 
