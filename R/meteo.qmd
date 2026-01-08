@@ -76,7 +76,7 @@ landmarks <- read_excel("data/Date_landmark.xlsx")  |>
     fake_year_fe = if_else((m_fe > 8) | (m_fe == 8 & d_fe >= 15), 2000, 2001),
     FIN_EXP_s = as.Date(sprintf("%04d-%02d-%02d", fake_year_fe, m_fe, d_fe)),
   ) |> 
-  select(PARTENAIRE, ENVIRONNEMENT, YEAR,
+  dplyr::select(PARTENAIRE, ENVIRONNEMENT, YEAR,
          DEBUT_EXP, DEBUT_CW, FIN_CW, DEBUT_FLO, FIN_FLO, FIN_EXP,
          DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P,
          DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |> 
@@ -84,7 +84,7 @@ landmarks <- read_excel("data/Date_landmark.xlsx")  |>
 
 
 landmarks_s <- landmarks |> 
-  select(ZERO, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s, INF) |> 
+  dplyr::select(ZERO, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s, INF) |> 
   split(noms)
 
 summary(landmarks)
@@ -96,7 +96,7 @@ Durée de chaque période
 ```{r}
 
 landmarks |> 
-  select(YEAR, ENVIRONNEMENT, DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P) |> 
+  dplyr::select(YEAR, ENVIRONNEMENT, DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P) |> 
   pivot_longer(c(DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P), names_to = "DUREE") |> 
   ggplot(aes(x = YEAR, y = value, colour = ENVIRONNEMENT)) +
   geom_point() +
@@ -114,7 +114,7 @@ A mettre dans l'ordre des saisons
 
 
 landmarks |> 
-  select(YEAR, ENVIRONNEMENT, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |> 
+  dplyr::select(YEAR, ENVIRONNEMENT, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |> 
   pivot_longer(c(DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s),
                names_to = "type_date",
                values_to = "value") |>  
@@ -154,7 +154,7 @@ landmarks |> ggplot(aes(x = as.factor(YEAR), y = DUREE_P)) + geom_boxplot() + th
 ```{r}
 
 ref_lm <- landmarks |> 
-  select(ZERO, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s, INF) |> 
+  dplyr::select(ZERO, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s, INF) |> 
   mutate(across(everything(), as.numeric)) |> 
   summarise(across(everything(), ~ round(mean(.x)))) |> 
   as.vector() |> 
@@ -278,7 +278,7 @@ dts = dts[order(names(dts))] |>  lapply(function(dt) {
       ),
       DATE_s = as.Date(sprintf("%04d-%02d-%02d", fake_year, m, d))
     ) |>
-    select(-c(m, d, fake_year))
+    dplyr::select(-c(m, d, fake_year))
 })
 
 dt_meteo <- imap_dfr(dts, ~ mutate(exp = .y, .x))
@@ -553,7 +553,7 @@ dts_lm$exp[which(is.na(dts_lm$DATE))]
 ```{r}
 
 land_long <- landmarks |>
-  select(PARTENAIRE, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |>
+  dplyr::select(PARTENAIRE, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |>
   pivot_longer(cols = -PARTENAIRE, names_to = "type", values_to = "date") |>
   mutate(
     m = month(date),

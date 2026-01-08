@@ -3,23 +3,35 @@ title: "Nuage"
 format: html
 ---
 
+#Importer ACP.f
+
+```{r}
+dt_meteo <- read.csv("data/meteo_lm")
+```
+
+
 ```{r}
 chrono_exp <- function(data, var, exp_sel = NULL) {
+
+  if (!inherits(data$DATE_s, "Date")) {
+    data$DATE_s <- as.Date(data$DATE_s)
+  }
 
   if (!is.null(exp_sel)) {
     data <- dplyr::filter(data, exp %in% exp_sel)
   }
 
-  ggplot(data, aes(x = DATE_s, y = {{var}}, color = exp, group = exp)) +
+  ggplot(data, aes(x = DATE_s, y = .data[[var]], color = exp, group = exp)) +
     geom_line() +
     theme_minimal() +
-    labs(x = "Date", y = deparse(substitute(var))) +
+    labs(x = "Date", y = var) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
     scale_x_date(
       date_labels = "%d-%b",
       limits = as.Date(c("2000-08-15", "2001-08-15"))
     )
 }
+
 ```
 
 
@@ -34,7 +46,7 @@ plot_indiv(pca,
            var = "Montego",
            axe = c(1, 2),
            variable = "TEMP_T_Q")
-chrono_exp(dt_meteo, "TEMP_T_Q", exp_sel = c("INRA13"))
+chrono_exp(dt_meteo, "TEMP_T_Q", exp_sel = c("INRA13", "INRA18"))
 
 ```
 
