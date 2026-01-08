@@ -10,8 +10,22 @@ library(fda)
 
 ```{r data}
 meteo_lm <- read.csv("data/meteo_lm")
+summary(meteo_lm)
 glimpse(meteo_lm)
 
+
+```
+
+
+```{r}
+noms <- c("INRA11","BGA11",
+          "INRA12",
+          "INRA13","TI13",
+          "EUR14","SYN14","MAD14","RAGT14",
+          "TI15","LIM15","SYN15","INRA15","BGA15","RAGT15","MAD15",
+          "INRA16",
+          "INRA17",
+          "INRA18","EUR18")
 ```
 
 
@@ -20,22 +34,30 @@ glimpse(meteo_lm)
 #| eval: false
 
 
-rangeval <- c(min(meteo_lm$old[1:200]), max(meteo_lm$old[1:200])) # définition de l'échelle (les longueurs d'ondes)
+rangeval <- c(min(meteo_lm$date_ref), max(meteo_lm$date_ref)) # définition de l'échelle (les longueurs d'ondes)
 nbasis <- 30 # Nombre de splines utilisées
 basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis) # création d'une base d'objet
 
 
 data_var <- meteo_lm |> 
-  dplyr::select(exp, old, E.HYD_ETAT.RU_1) |> 
-  mutate(old = as.numeric(old)) |> 
-  pivot_wider(names_from = old, values_from = E.HYD_ETAT.RU_1) |> 
-  column_to_rownames("exp") |> 
-  as.matrix()
+  dplyr::select(exp, date_ref, E.HYD_WSC) |> 
+  mutate(date_ref = as.numeric(date_ref)) |> 
+  pivot_wider(names_from = date_ref, values_from = E.HYD_WSC) |> 
+  column_to_rownames("exp") 
 
-data_var <- data_var[, 1:200] #On restreint la série sur les 200 premières valeurs
+
+##### si on veut faire une acp et non uen svd 
+# m <- apply(data_var, 1, mean)
+# s <- apply(data_var - m, 1, sd)
+# 
+# data_var <- (data_var - m) / s |> 
+#   as.matrix() 
+##### si on veut faire une acp et non uen svd 
+
+data_var <- as.matrix(data_var) 
 
 time <- as.numeric(colnames(data_var))
-fdParobj <- fdPar(basisobj, lambda = 1e-6)
+fdParobj <- fdPar(basisobj, lambda = 1e-3)
 
 fdsmooth <- smooth.basis(
   argvals  = time,
@@ -45,7 +67,81 @@ fdsmooth <- smooth.basis(
 
 
 fdobj <- fdsmooth$fd
-plot(fdobj) #Attention, EUR 18, INRA 16, INRA 17 et INRA 18 30 coefficients des fonctions Bsplines indisponibles 
+plot(fdobj) 
+
+
+```
+
+
+centré fonction pour chaque exp
+
+plot fonctions principales
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#fonction crea data pour acp f
+```{r}
+
+data_acp_f <- function(var, centre = FALSE){
+  rangeval <- c(min(meteo_lm$date_ref), max(meteo_lm$date_ref)) # définition de l'échelle (les longueurs d'ondes)
+  nbasis <- 30 # Nombre de splines utilisées
+  basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis) # création d'une base d'objet
+  
+  
+  data_var <- meteo_lm |> 
+    dplyr::select(exp, date_ref, var) |> 
+    mutate(date_ref = as.numeric(date_ref)) |> 
+    pivot_wider(names_from = date_ref, values_from = var) |> 
+    column_to_rownames("exp") 
+  
+  
+  ##### si on veut faire une acp et non une svd 
+  if(centre){
+    m <- apply(data_var, 1, mean)
+    s <- apply(data_var - m, 1, sd)
+    
+    data_var <- (data_var - m) / s |> 
+      as.matrix() 
+  }
+  
+  data_var <- as.matrix(data_var) 
+  
+  time <- as.numeric(colnames(data_var))
+  fdParobj <- fdPar(basisobj, lambda = 1e-3)
+  
+  fdsmooth <- smooth.basis(
+    argvals  = time,
+    y        = t(data_var),  # smooth.basis attend temps × individus
+    fdParobj = fdParobj
+  )
+  
+  
+  fdobj <- fdsmooth$fd
+  plot(fdobj) 
+  return(fdobj)
+}
+
+fdobj <- data_acp_f(E.HYD_WSC, centre = F)
 
 ```
 
@@ -58,9 +154,7 @@ plot(fdobj) #Attention, EUR 18, INRA 16, INRA 17 et INRA 18 30 coefficients des 
 
 
 
-
-
-
+vérif approximation
 
 ```{r}
 
@@ -68,7 +162,7 @@ data_var
 time
 
 
-time_fine <- seq(min(time), max(time), length.out = 200)
+time_fine <- seq(min(time), max(time), length.out = 500)
 
 # valeurs lissées
 smooth_values <- eval.fd(time_fine, fdobj)
@@ -82,7 +176,7 @@ df_smooth_long <- df_smooth |>
   pivot_longer(
     -time,
     names_to = "exp",
-    values_to = "TEMP_T_Q"
+    values_to = "E.HYD_WSC"
   )
 
 #################
@@ -93,7 +187,7 @@ df_raw <- data_var |>
   pivot_longer(
     -exp,
     names_to = "time",
-    values_to = "TEMP_T_Q"
+    values_to = "E.HYD_WSC"
   ) |>
   mutate(time = as.numeric(time))
 
@@ -107,12 +201,12 @@ for (e in exps) {
   p <- ggplot() +
     geom_point(
       data = df_raw |> filter(exp == e),
-      aes(time, TEMP_T_Q),
+      aes(time, E.HYD_WSC),
       alpha = 0.6
     ) +
     geom_line(
       data = df_smooth_long |> filter(exp == e),
-      aes(time, TEMP_T_Q),
+      aes(time, E.HYD_WSC),
       color = "red",
       linewidth = 1
     ) +
@@ -131,29 +225,71 @@ for (e in exps) {
 
 
 
+E1 -centrage 
+calcule de la fonction moyenne, 
+puis la soustraire à toutes les fonctions
 
+E2 - opérateur de covariance
+E3 - 
+résoudre $$\frac{1}{N} * C^T * W *   C * v = λv $$
+avec C matrice des coef centrés et W marice de gram de la base de spline (indépendance)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-```{r ACP fonctionnelle}
-
-res.fpca <- pca.fd(fdobj)
-plot.pca.fd(res.fpca)
+E4 - CALCULE
+```{r}
+pca <- pca.fd(fdobj, nharm = 5)
+plot.pca.fd(pca)
+pca$harmonics
 ```
+
+
+```{r}
+
+scores <- as.data.frame(pca$scores)
+scores$name <- noms
+scores |> 
+  ggplot(aes(x = V1, y = V2)) +
+  geom_point(aes(color = noms), size = 3) +  # points rouges
+  geom_text(aes(label = noms), vjust = -1) +  # nom des sites au-dessus
+  theme_minimal() +
+  labs(x = "Dimension 1 : 0.62%", y = "Dimension 2 : 0.14%")
+
+# valeur pour non centré reduit
+
+```
+Peux etre faire une droite pour l'axe 1 et un plan pour 2 et 3
+
+```{r}
+
+plot(pca$harmonics[1] + pca$harmonics[2],
+     main = "Première composante principale fonctionnelle",
+     xlab = "Temps",
+     ylab = "Valeur")
+
+```
+
+
+On a ce qui suit en pourcentage d'explication
+```{r}
+pca$varprop
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
