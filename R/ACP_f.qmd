@@ -13,6 +13,14 @@ meteo_lm <- read.csv("data/meteo_lm")
 summary(meteo_lm)
 glimpse(meteo_lm)
 
+ref_lm <- read.csv("data/ref_lm.csv")
+ref_lm_v <- ref_lm$x[2:7]
+periode_clim <- ref_lm$X[2:7] 
+periode_clim <- sub("_s$", "", periode_clim)
+
+rendement <- read.csv("data/rendement.csv") |>
+  dplyr::select(-X) |> 
+  dplyr::mutate(variety = sub("^[^_]*_[^_]*_", "", variety))
 
 ```
 
@@ -29,89 +37,20 @@ noms <- c("INRA11","BGA11",
 ```
 
 
-```{r premiere_ACP}
-#| echo: false
-#| eval: false
-
-
-rangeval <- c(min(meteo_lm$date_ref), max(meteo_lm$date_ref)) # définition de l'échelle (les longueurs d'ondes)
-nbasis <- 30 # Nombre de splines utilisées
-basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis) # création d'une base d'objet
-
-
-data_var <- meteo_lm |> 
-  dplyr::select(exp, date_ref, E.HYD_WSC) |> 
-  mutate(date_ref = as.numeric(date_ref)) |> 
-  pivot_wider(names_from = date_ref, values_from = E.HYD_WSC) |> 
-  column_to_rownames("exp") 
-
-
-##### si on veut faire une acp et non uen svd 
-# m <- apply(data_var, 1, mean)
-# s <- apply(data_var - m, 1, sd)
-# 
-# data_var <- (data_var - m) / s |> 
-#   as.matrix() 
-##### si on veut faire une acp et non uen svd 
-
-data_var <- as.matrix(data_var) 
-
-time <- as.numeric(colnames(data_var))
-fdParobj <- fdPar(basisobj, lambda = 1e-3)
-
-fdsmooth <- smooth.basis(
-  argvals  = time,
-  y        = t(data_var),  # smooth.basis attend temps × individus
-  fdParobj = fdParobj
-)
-
-
-fdobj <- fdsmooth$fd
-plot(fdobj) 
-
-
-```
-
-
-centré fonction pour chaque exp
-
-plot fonctions principales
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #fonction crea data pour acp f
-```{r}
+```{r fonction crea data pour acp f}
 
-data_acp_f <- function(var, centre = FALSE){
+data_acp_f <- function(var, centre = FALSE, plot = TRUE){
   rangeval <- c(min(meteo_lm$date_ref), max(meteo_lm$date_ref)) # définition de l'échelle (les longueurs d'ondes)
   nbasis <- 30 # Nombre de splines utilisées
   basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis) # création d'une base d'objet
   
   
   data_var <- meteo_lm |> 
-    dplyr::select(exp, date_ref, var) |> 
+    dplyr::select(exp, date_ref, {{var}}) |> 
     mutate(date_ref = as.numeric(date_ref)) |> 
-    pivot_wider(names_from = date_ref, values_from = var) |> 
+    pivot_wider(names_from = date_ref, values_from = {{var}}) |> 
     column_to_rownames("exp") 
   
   
@@ -137,11 +76,218 @@ data_acp_f <- function(var, centre = FALSE){
   
   
   fdobj <- fdsmooth$fd
-  plot(fdobj) 
+  
+  if(plot){plot(fdobj)}
+  
   return(fdobj)
 }
 
-fdobj <- data_acp_f(E.HYD_WSC, centre = F)
+fdobj <- data_acp_f(E.HYD_WSC, centre = F, plot = T)
+
+```
+
+
+
+
+
+E1 -centrage 
+calcule de la fonction moyenne, 
+puis la soustraire à toutes les fonctions
+
+E2 - opérateur de covariance
+E3 - 
+résoudre $$\frac{1}{N} * C^T * W *   C * v = λv $$
+avec C matrice des coef centrés et W marice de gram de la base de spline (indépendance)
+
+E4 - CALCULE
+```{r pca.fd}
+pca <- pca.fd(fdobj, nharm = 5)
+```
+
+
+```{r plot harmoique}
+plot.pca.fd(pca)
+```
+
+
+On a ce qui suit en pourcentage d'explication
+```{r proportion explique}
+pca$varprop
+```
+
+
+```{r}
+
+plot_indiv <- function(acpf, type_rend = "SY", variety = "Aviso", axe = c(1, 2), variable){
+  
+    V <- paste0("V" ,axe)
+    
+    scores <- as.data.frame(pca$scores)
+    scores$exp <- noms
+    scores <- scores |> 
+      left_join(rendement |> 
+              filter(type == type_rend,
+                     variety == variety))
+  
+  if(length(axe) == 2){
+
+    scores |> 
+      ggplot(aes(x = .data[[V[1]]], y = .data[[V[2]]])) +
+      geom_point(aes(color = exp, size = value)) +  
+      geom_text(aes(label = exp), vjust = -1) +  # nom des sites au-dessus
+      theme_minimal() +
+      labs(x = paste0("Dimension ", axe[1], " : ", round(pca$varprop[axe[1]], 2)*100, "%"),
+           y = paste0("Dimension ", axe[2], " : ", round(pca$varprop[axe[2]], 2)*100, "%"),
+           title = paste0("Le rendement ", type_rend, " sur le plan de l'ACP (axes ", axe[1], " et ", axe[2], ") avec la variable", as.character(variable)))
+    
+  }else if(length(axe) == 1){
+    
+        scores |> 
+      ggplot(aes(x = .data[[V[1]]], y = 0)) +
+      geom_point(aes(color = exp, size = value)) +  
+      geom_text(aes(label = exp), vjust = -1) +  # nom des sites au-dessus
+      theme_minimal() +
+      labs(x = paste0("Dimension ", axe[1], " : ", round(pca$varprop[axe[1]], 2)*100, "%"),
+           y = "",
+           title = paste0("Le rendement ", type_rend, " sur l'axe de l'ACP (axe ", axe[1], ") avec la variable", as.character(variable)))
+    
+  }
+}
+
+plot_indiv(pca,
+           type_rend = "TSW",
+           variety = "Montego",
+           axe = c(1, 2),
+           variable = "")
+
+
+```
+Peux etre faire une droite pour l'axe 1 et un plan pour 2 et 3
+
+si 3 à plus de 25% de 1 et 2 + 3 a plus que 1
+
+```{r}
+
+plot_harmonique <- function(i){
+  fd_eval <- eval.fd(seq(min(fdobj$basis$rangeval),
+                         max(fdobj$basis$rangeval),
+                         length.out = 100),
+                     pca$harmonics[i])
+  
+  ylim <- range(fd_eval)
+  num <- c("Première", "Deuxième", "Troisième", "Quatrième", "Cinquième")
+  
+  plot(pca$harmonics[i],
+       main = paste(num[i], "composante principale fonctionnelle"),
+       xlab = "Temps",
+       ylab = "Valeur")  # humidité generale
+  rect(ref_lm_v[-length(ref_lm_v)],  # xleft
+       ylim[1],                # ybottom
+       ref_lm_v[-1],               # xright
+       ylim[2],                # ytop
+       col = c(
+         rgb(1, 0, 0, 0.15),
+         rgb(0, 1, 0, 0.15),
+         rgb(0, 0, 1, 0.15)
+       ),
+       border = NA)
+  
+  y_text <- ylim[1] + 0.05 * diff(ylim)
+  
+  text(ref_lm_v, y_text,
+       labels = periode_clim,
+       cex = 0.9, srt = 90,
+       xpd = TRUE)
+}
+
+plot_harmonique(1)  #humidité moyenne
+plot_harmonique(2)  #sec fin
+plot_harmonique(3)  # Humide début mais sec fin
+
+```
+
+
+# reconstruire la courbe à partire des harmoniques
+```{r}
+i <- 2  # experience à reconstruire
+k <- 5  # nb harmonique prise en compte
+
+fd_recon_i <- mean.fd(fdobj)
+
+for (j in 1:k) {
+  fd_recon_i <- fd_recon_i + pca$scores[i, j] * pca$harmonics[j]
+}
+
+plot(fd_recon_i,
+     main = "Courbe fonctionnelle – INRA11",
+     xlab = "Temps",
+     ylab = "Valeur")
+
+plot(fdobj[i],
+     main = "Courbe fonctionnelle – INRA11",
+     xlab = "Temps",
+     ylab = "Valeur")
+
+
+```
+
+
+
+Plot inra11 vrai et approx h1, h2, h3   oui 
+
+plot landmark avec zone entre           oui
+
+plot rendement                          oui
+
+plot propre
+
+Fonction qui prends tout en compte (espèce, type rendement, variable d'interet)
+
+
+
+
+
+```{r}
+
+
+time_grid <- seq(min(fdobj$basis$rangeval),
+                 max(fdobj$basis$rangeval),
+                 length.out = 100)
+
+fd_eval <- eval.fd(time_grid, fdobj)
+
+
+df_plot <- as.data.frame(fd_eval)
+df_plot$time <- time_grid
+
+df_long <- df_plot %>%
+  pivot_longer(
+    cols = -time,
+    names_to = "individu",
+    values_to = "value"
+  )
+
+ggplot(df_long, aes(x = time, y = value, group = individu)) +
+  geom_line(alpha = 0.5) +
+  theme_minimal() +
+  labs(x = "Temps", y = "Valeur")
+
+ggplot(df_long, aes(time, value, color = individu)) +
+  geom_line(show.legend = FALSE)
+
+fd_mean <- mean.fd(fdobj)
+mean_eval <- eval.fd(time_grid, fd_mean)
+data_mean <- data.frame(time = time_grid, value = mean_eval)
+
+ggplot(df_long, aes(time, value, group = individu)) +
+  geom_line(alpha = 0.3) +
+  geom_line(
+    data = data_mean,
+    aes(time, value),
+    linewidth = 1.2,
+    color = "black"
+  ) +
+  theme_minimal()
 
 ```
 
@@ -154,7 +300,17 @@ fdobj <- data_acp_f(E.HYD_WSC, centre = F)
 
 
 
-vérif approximation
+
+
+
+
+
+
+
+
+
+
+vérif approximation a suppr
 
 ```{r}
 
@@ -216,97 +372,8 @@ for (e in exps) {
   print(p)
 }
 
-#points noirs --> données brures
-#courbe rouge --> fonction lissée$
-#Comparer les mesures observées à la reconstuction fonctionnelle
 
 ```
-
-
-
-
-E1 -centrage 
-calcule de la fonction moyenne, 
-puis la soustraire à toutes les fonctions
-
-E2 - opérateur de covariance
-E3 - 
-résoudre $$\frac{1}{N} * C^T * W *   C * v = λv $$
-avec C matrice des coef centrés et W marice de gram de la base de spline (indépendance)
-
-E4 - CALCULE
-```{r}
-pca <- pca.fd(fdobj, nharm = 5)
-plot.pca.fd(pca)
-pca$harmonics
-```
-
-
-On a ce qui suit en pourcentage d'explication
-```{r}
-pca$varprop
-```
-
-
-```{r}
-
-scores <- as.data.frame(pca$scores)
-scores$name <- noms
-scores |> 
-  ggplot(aes(x = V1, y = V2)) +
-  geom_point(aes(color = noms), size = 3) +  # points rouges
-  geom_text(aes(label = noms), vjust = -1) +  # nom des sites au-dessus
-  theme_minimal() +
-  labs(x = "Dimension 1 : 0.62%", y = "Dimension 2 : 0.14%")
-
-# valeur pour non centré reduit
-
-```
-Peux etre faire une droite pour l'axe 1 et un plan pour 2 et 3
-
-```{r}
-
-plot(pca$harmonics[1],
-     main = "Première composante principale fonctionnelle",
-     xlab = "Temps",
-     ylab = "Valeur")
-
-
-plot(pca$harmonics[2],
-     main = "Deuxième composante principale fonctionnelle",
-     xlab = "Temps",
-     ylab = "Valeur")  #sec fin
-
-plot(pca$harmonics[3],
-     main = "Troisième composante principale fonctionnelle",
-     xlab = "Temps",
-     ylab = "Valeur") # Humide début mais sec fin
-```
-
-
-
-
-Plot inra11 vrai et approx h1, h2, h3
-
-plot landmark avec zone entre
-
-plot rendement
-
-Fonction qui prends tout en compte (espèce, type rendement, variable d'interet)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
