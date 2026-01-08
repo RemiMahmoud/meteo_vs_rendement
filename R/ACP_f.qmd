@@ -118,7 +118,7 @@ pca$varprop
 
 ```{r}
 
-plot_indiv <- function(acpf, type_rend = "SY", variety = "Aviso", axe = c(1, 2), variable){
+plot_indiv <- function(acpf, type_rend = "SY", var = "Aviso", axe = c(1, 2), variable){
   
     V <- paste0("V" ,axe)
     
@@ -127,7 +127,7 @@ plot_indiv <- function(acpf, type_rend = "SY", variety = "Aviso", axe = c(1, 2),
     scores <- scores |> 
       left_join(rendement |> 
               filter(type == type_rend,
-                     variety == variety))
+                     variety == var))
   
   if(length(axe) == 2){
 
@@ -155,16 +155,34 @@ plot_indiv <- function(acpf, type_rend = "SY", variety = "Aviso", axe = c(1, 2),
 }
 
 plot_indiv(pca,
-           type_rend = "TSW",
-           variety = "Montego",
+           type_rend = "SY",
+           var = "Montego",
            axe = c(1, 2),
            variable = "")
-
 
 ```
 Peux etre faire une droite pour l'axe 1 et un plan pour 2 et 3
 
 si 3 à plus de 25% de 1 et 2 + 3 a plus que 1
+
+
+
+```{r}
+df_diff <- rendement %>%
+  pivot_wider(
+    names_from  = variety,
+    values_from = value
+  ) %>%
+  mutate(diff = Aviso - Montego) |> 
+  dplyr::filter(type == "TSW")
+```
+
+
+
+
+
+
+
 
 ```{r}
 
