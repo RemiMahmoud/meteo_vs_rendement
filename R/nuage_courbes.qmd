@@ -56,4 +56,55 @@ plot(fdobj[c("INRA13", "TI13")])   # troisième comp
 
 ```
 
+```{r}
+plot_fdobj_exp <- function(fdobj, exp){
+  
+  saison <- c("AUTOMNE", "HIVER", "MONTAISON", "FLORAISON", "P300-P1000")
+  
+  fd_subset <- fdobj[exp]
+  
+  n <- length(exp)
+  
+  cols <- rainbow(n)
+  
+  plot(fd_subset,
+       col = cols, 
+       lty = 1, 
+       xlab = "", 
+       ylab = "Moyenne des températures",
+       main = "Courbes fonctionnelles estimées")
+  
+  colours <- adjustcolor(
+  c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+  alpha.f = 0.25)
+  
+  rect(ref_lm_v[-length(ref_lm_v)],  # xleft
+       ylim[1],                # ybottom
+       ref_lm_v[-1],               # xright
+       ylim[2],                # ytop
+       col = colours,
+       border = NA)
+  
+  y_text <- ylim[1] + 0.05 * diff(ylim)
+  
+  x_centers <- (ref_lm_v[-length(ref_lm_v)] + ref_lm_v[-1]) / 2  # centre des rectangles
+  y_label <- ylim[1] - 0.1 * diff(ylim)                         # un peu en dessous
+  text(x = x_centers[1:length(saison)], 
+       y = y_label, 
+       labels = saison, 
+       cex = 0.9, 
+       xpd = TRUE)
+
+}
+
+plot_fdobj_exp(fdobj, c("INRA13", "INRA18")) 
+
+```
+
+Faire appel aux landmarks de exp spécifiquement 
+ref_lm + rect
+
+```{r}
+
+```
 
