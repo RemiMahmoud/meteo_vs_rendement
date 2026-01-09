@@ -367,7 +367,7 @@ for (j in 1:k) {
 }
 
 plot(fd_recon_i,
-     main = "Courbe fonctionnelle – INRA11",
+     main = "Courbe fonctionnelle approx – INRA11",
      xlab = "Temps",
      ylab = "Valeur")
 
