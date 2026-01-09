@@ -82,6 +82,7 @@ landmarks <- read_excel("data/Date_landmark.xlsx")  |>
          DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |> 
   mutate(ZERO = 0, INF = 20000)
 
+# write.csv(landmarks, "C:/Users/louis/OneDrive/Bureau/Cours/M2/meteo_vs_rendement/data/landmarks.csv")
 
 landmarks_s <- landmarks |> 
   dplyr::select(ZERO, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s, INF) |> 
