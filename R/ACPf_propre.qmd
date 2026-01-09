@@ -132,10 +132,9 @@ plot_indiv <- function(acpf, type_rend = "SY", var = "Aviso", axe = c(1, 2), var
               filter(type == type_rend,
                      variety == var))
     
-    print(axe[c(1, 2)])
-    print(acpf$varprop[axe[c(1, 2)]])
-    print(acpf$varprop)
+    print(scores)
     
+
   if(length(axe) == 2){
 
     scores |> 
