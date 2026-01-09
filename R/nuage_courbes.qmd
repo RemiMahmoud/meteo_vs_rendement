@@ -44,9 +44,15 @@ pca <- pca.fd(fdobj, nharm = 5)
 plot_indiv(pca,
            type_rend = "SY",
            var = "Montego",
-           axe = c(1, 2),
+           axe = c(1, 3),
            variable = "TEMP_T_Q")
 chrono_exp(dt_meteo, "TEMP_T_Q", exp_sel = c("INRA13", "INRA18"))
+
+
+plot(fdobj[c("INRA13", "BGA11")]) #première comp
+plot(fdobj[c("TI13", "EUR14")])   #deuxième comp
+plot(fdobj[c("INRA13", "TI13")])   # troisième comp
+
 
 ```
 
