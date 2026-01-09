@@ -1,0 +1,257 @@
+---
+title: "ACPf_mult"
+format: html
+---
+
+
+```{r library}
+library(tidyverse)
+library(fda)
+library(FactoMineR)
+```
+
+
+```{r data}
+meteo_lm <- read.csv("data/meteo_lm")
+summary(meteo_lm)
+glimpse(meteo_lm)
+
+ref_lm <- read.csv("data/ref_lm.csv")
+ref_lm_v <- ref_lm$x[2:7]
+periode_clim <- ref_lm$X[2:7] 
+periode_clim <- sub("_s$", "", periode_clim)
+
+rendement <- read.csv("data/rendement.csv") |>
+  dplyr::select(-X) |> 
+  dplyr::mutate(variety = sub("^[^_]*_[^_]*_", "", variety)) |> 
+  tidyr::pivot_wider(names_from = variety, values_from = value) |> 
+  pivot_wider(names_from = type, values_from = c(Montego, Aviso))
+
+landmarks <- read.csv("data/landmarks.csv")
+
+```
+
+
+```{r noms}
+noms <- c("INRA11","BGA11",
+          "INRA12",
+          "INRA13","TI13",
+          "EUR14","SYN14","MAD14","RAGT14",
+          "TI15","LIM15","SYN15","INRA15","BGA15","RAGT15","MAD15",
+          "INRA16",
+          "INRA17",
+          "INRA18","EUR18")
+```
+
+
+```{r fonction crea data pour acp f}
+
+data_acp_f <- function(var, centre = FALSE, plot = TRUE, nbspines = 30){
+  rangeval <- c(min(meteo_lm$date_ref), max(meteo_lm$date_ref)) # définition de l'échelle (les longueurs d'ondes)
+  nbasis <- nbspines # Nombre de splines utilisées
+  basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis) # création d'une base d'objet
+  
+  
+  data_var <- meteo_lm |> 
+    dplyr::select(exp, date_ref, {{var}}) |> 
+    mutate(date_ref = as.numeric(date_ref)) |> 
+    pivot_wider(names_from = date_ref, values_from = {{var}}) |> 
+    column_to_rownames("exp") 
+  
+  
+  ##### si on veut faire une acp et non une svd 
+  if(centre){
+    m <- apply(data_var, 1, mean)
+    s <- apply(data_var - m, 1, sd)
+    
+    data_var <- (data_var - m) / s |> 
+      as.matrix() 
+  }
+  
+  data_var <- as.matrix(data_var) 
+  
+  time <- as.numeric(colnames(data_var))
+  fdParobj <- fdPar(basisobj, lambda = 1e-3)
+  
+  fdsmooth <- smooth.basis(
+    argvals  = time,
+    y        = t(data_var),  # smooth.basis attend temps × individus
+    fdParobj = fdParobj
+  )
+  
+  
+  fdobj <- fdsmooth$fd
+  
+  if(plot){plot(fdobj)}
+  
+  return(fdobj)
+}
+
+# fdobj <- data_acp_f(E.HYD_WSC, centre = F, plot = T)
+
+```
+
+
+```{r fonction crea data supp pour acp f}
+
+data_sup <- rendement |> 
+  arrange(match(exp, noms)) |> 
+  dplyr::left_join(landmarks |>
+                     dplyr::rename("exp" = PARTENAIRE) |> 
+                     dplyr::select(exp, DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P))
+
+```
+
+
+```{r fonction var sup}
+plot_var_supp <- function(variable,
+                     centre = F, plot = F, nbspines = 30,
+                     data_sup, nharm = 5, axe = c(1, 2)){
+  
+  fdobj <- data_acp_f({{variable}}, centre = centre, plot = plot, nbspines = nbspines)  # crea data (spline)
+
+  
+  # selection les exp sans données manquantes
+  data_sup_ok <- data_sup |> 
+    filter(if_all(everything(), ~ !is.na(.)))
+  
+  fdobj_ok <- fdobj[pull(data_sup_ok, exp)]
+  
+  #ACPf
+  acpf <- pca.fd(fdobj_ok, nharm = nharm) 
+  
+  scores <- acpf$scores
+  
+  data_sup_ok <- data_sup_ok |> 
+    dplyr::select(-exp) |> 
+    as.list()
+  
+  coor_sup <- purrr::imap_dfr(data_sup_ok, ~{
+    coor <- apply(scores, 2, cor, y = .x, use = "na.or.complete")
+    data.frame(exp = .y, t(coor))
+  })
+  
+  coor_sup <- mutate(coor_sup, across(everything(), ~replace_na(.x, 0))) |> 
+    as.data.frame()
+  
+  
+  X <- paste0("X" ,axe)
+  
+  coor_sup |> 
+    ggplot(aes(xend = .data[[X[1]]], yend = .data[[X[2]]])) +
+    geom_segment(aes(x = 0, y = 0, xend = .data[[X[1]]], yend = .data[[X[2]]], color = exp),
+                 arrow = arrow(length = unit(0.3, "cm"), type = "closed"),
+                 linewidth = 1.2) +
+    geom_text(aes(x = .data[[X[1]]], y = .data[[X[2]]], label = exp),
+              hjust = -0.2, vjust = -0.2) +
+    coord_fixed() +
+    geom_path(data=data.frame(x=cos(seq(0,2*pi,length.out=200)),
+                              y=sin(seq(0,2*pi,length.out=200))),
+              inherit.aes = FALSE, aes(x=x, y=y),
+              color="black", size=0.5) +
+    theme_minimal() +
+    labs(x = paste0("Dimension ", axe[1], " : ", round(acpf$varprop[axe[1]], 2)*100, "%"),
+           y = paste0("Dimension ", axe[2], " : ", round(acpf$varprop[axe[2]], 2)*100, "%"),
+           title = paste0("Le cercle de correlation des variables supplémentaire"))
+}
+
+```
+
+
+```{r fonction var sup}
+
+plot_var_supp("TEMP_T_Q", data_sup = data_sup, nbspines = 10, axe = c(2, 3))
+
+```
+
+
+```{r }
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r  regression fonctionnelle}
+
+linmod <- fRegress(y ~ acpf$fdobj)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
