@@ -164,8 +164,21 @@ plot_indiv <- function(acpf, type_rend = "SY", var = "Aviso", axe = c(1, 2), var
 ```
 
 
-```{r fun_acpf}
+```{r fun_acpf plot}
 fun_acpf <- function(variable,
+                     centre = F, plot = T, nbspines = 30,
+                     nharm = 5){
+  
+  fdobj <- data_acp_f({{variable}}, centre = centre, plot = plot, nbspines = nbspines)  # crea data (spline)
+  acpf <- pca.fd(fdobj, nharm = nharm)                          # pca fun
+}
+
+fun_acpf("TEMP_T_Q", nbspines = 10)
+```
+
+
+```{r fun_acpf plot}
+fun_acpf_plot <- function(variable,
                      centre = F, plot = T, nbspines = 30,
                      nharm = 5,
                      type_rend = "SY", var = "Aviso", axe = c(1, 2)){
@@ -184,7 +197,7 @@ fun_acpf <- function(variable,
   plot_indiv(acpf, type_rend = type_rend, var = var, axe = c(1, 2), variable = variable)
 }
 
-fun_acpf("TEMP_T_Q", nbspines = 10)
+fun_acpf_plot("TEMP_T_Q", nbspines = 10)
 
 
 ```
