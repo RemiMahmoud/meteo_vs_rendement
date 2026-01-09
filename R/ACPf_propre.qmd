@@ -118,7 +118,7 @@ plot_harmonique <- function(acpf, i){
 
 ```
 
-
+ajouter sum montego aviso
 ```{r plot_indiv}
 
 plot_indiv <- function(acpf, type_rend = "SY", var = "Aviso", axe = c(1, 2), variable){
@@ -131,7 +131,11 @@ plot_indiv <- function(acpf, type_rend = "SY", var = "Aviso", axe = c(1, 2), var
       left_join(rendement |> 
               filter(type == type_rend,
                      variety == var))
-  
+    
+    print(axe[c(1, 2)])
+    print(acpf$varprop[axe[c(1, 2)]])
+    print(acpf$varprop)
+    
   if(length(axe) == 2){
 
     scores |> 
