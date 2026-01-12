@@ -284,7 +284,7 @@ dts = dts[order(names(dts))] |>  lapply(function(dt) {
 
 dt_meteo <- imap_dfr(dts, ~ mutate(exp = .y, .x))
 
-
+write.csv(dt_meteo, "data/meteo_brute.csv")
 
 rm(INRA11,BGA11,INRA12,INRA13,TI13,EUR14,SYN14,MAD14,RAGT14,TI15,LIM15,SYN15,INRA15,BGA15,RAGT15,MAD15,INRA16,INRA17,INRA18,EUR18, read_meteo)
 
@@ -330,16 +330,16 @@ graph_TEMP_T_Q <- dt_meteo  |>
     limits = as.Date(c("2000-08-15", "2001-08-15"))
   )
 
-# graph_TEMP_GDD <- dt_meteo  |> 
-#   ggplot(aes(x = DATE_s, y = TEMP_GDD, color = exp, group = exp)) +
-#   geom_line() +
-#   theme_minimal() +
-#   labs(x = "Date", y = "Température moyenne") +
-#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-#   scale_x_date(
-#     date_labels = "%d-%b",
-#     limits = as.Date(c("2000-08-15", "2001-08-15"))
-#   )
+graph_TEMP_GDD <- meteo_lm  |>
+  ggplot(aes(x = DATE_s, y = TEMP_GDD, color = exp, group = exp)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date", y = "Température moyenne") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_date(
+    date_labels = "%d-%b",
+    limits = as.Date(c("2000-08-15", "2001-08-15"))
+  )
 
 graph_E.HYD_PRELIQ <- dt_meteo  |> 
   ggplot(aes(x = DATE_s, y = E.HYD_PRELIQ_Q, color = exp, group = exp)) +
@@ -398,7 +398,7 @@ graph_RAYO <- dt_meteo  |>
 
 graph_RAYO_cumul <- dt_meteo  |> 
  # filter(exp == "INRA18") |> 
-  ggplot(aes(x = DATE_s, y = RAYO_Cumul_RG, color = exp, group = exp)) +
+  ggplot(aes(x = DATE_s, y = RAYO_Cumul, color = exp, group = exp)) +
   geom_line() +
   theme_minimal() +
   labs(x = "Date", y = "Sum of Solar Irradiance") +
@@ -428,7 +428,6 @@ graph_E.HYD_WSC       # quantité réélement pour la plante
 graph_RAYO            # Quantité de lumière par unité de surface recu
 graph_RAYO_cumul      # rayonement cumulatif
 graph_Photoper        # Durée jour / durée nuit
-
 
 ```
 
@@ -528,8 +527,6 @@ dts_lm_l <- vector("list", length(dts))
 names(dts_lm_l) <- noms
 
 
-name <- "SYN15"
-
 for (name in names(dts)){
   
   l_s <- landmarks_s[[name]] |> as.numeric()
@@ -563,7 +560,7 @@ for (name in names(dts)){
 dts_lm <- imap_dfr(dts_lm_l, ~ mutate(exp = .y, .x)) |> 
   relocate(exp, .before = 1)
 
-# write.csv(meteo_lm, "data/meteo_lm")
+# write.csv(dt_meteo, "data/meteo_lm")
 
 summary(dts_lm)
 
