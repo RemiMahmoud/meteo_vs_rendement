@@ -7,7 +7,6 @@ format: html
 ```{r library}
 library(tidyverse)
 library(fda)
-library(FactoMineR)
 ```
 
 
@@ -160,77 +159,9 @@ plot_var_supp <- function(variable,
 
 ```{r fonction var sup}
 
-plot_var_supp("TEMP_T_Q", data_sup = data_sup, nbspines = 10, axe = c(2, 3))
+plot_var_supp("TEMP_GDD", data_sup = data_sup, nbspines = 30, axe = c(1, 2))
 
 ```
-
-
-```{r}
-
-
-
-fdobj <- data_acp_f("TEMP_T_Q")  # crea data (spline)
-
-data_sup_f <- data_acp_f("E.HYD_WSC")
-
-#ACPf
-acpf <- pca.fd(fdobj, nharm = 5) 
-
-
-if (!inherits(data_sup_f, "fd")) stop("data_sup_f doit être un objet fd")
-
-# mêmes argvals
-if (!all(data_sup_f$basis$rangeval == fdobj$basis$rangeval)) {
-  stop("Les variables supplémentaires doivent avoir le même intervalle de temps que fdobj")
-}
-class(acpf$harmonics)
-class(data_sup_f)
-cor_fd_sup <- cor.fd(as.vector(eval.fd(ref_lm_v[1]:ref_lm_v[length(ref_lm_v)], acpf$harmonics)),
-                     acpf$harmonics,
-                     as.vector(eval.fd(ref_lm_v[1]:ref_lm_v[length(ref_lm_v)], data_sup_f)),
-                     data_sup_f)
-
-coor_sup <- as.data.frame(cor_fd_sup)
-coor_sup$exp <- colnames(cor_fd_sup)
-
-
-
-
-scores <- acpf$scores
-
-cor.fd(acpf$harmonics, data_sup_f)
-
-coor_sup <- purrr::imap_dfr(data_sup_f, ~{
-  coor <- apply(scores, 2, cor.fd, y = .x, use = "na.or.complete")
-  data.frame(exp = .y, t(coor))
-})
-
-coor_sup <- mutate(coor_sup, across(everything(), ~replace_na(.x, 0))) |> 
-  as.data.frame()
-
-```
-
-
-
-```{r}
-
-# grille de temps pour l'évaluation
-time_grid <- seq(fdobj$basis$rangeval[1], fdobj$basis$rangeval[2], length.out = 500)
-
-# évaluer les harmoniques et les fonctions supplémentaires
-harm_eval <- eval.fd(time_grid, acpf$harmonics)
-sup_eval  <- eval.fd(time_grid, data_sup_f)
-
-# coor_sup : matrice corrélations
-coor_sup <- apply(sup_eval, 2, function(f) {
-  apply(harm_eval, 2, function(h) cor(h, f))
-})
-
-coor_sup <- as.data.frame(t(coor_sup))
-```
-
-
-
 
 
 ```{r}
@@ -240,22 +171,26 @@ coor_sup <- as.data.frame(t(coor_sup))
 plot_var_supp_f <- function(variable, var_supp, supp_brut_harm = T,
                             centre = F, plot = F, nbspines = 30,
                             nharm = 5, axe = c(1, 2)){
+  
+  fdobj <- data_acp_f({{variable}},
+                      centre = centre,
+                      plot = plot,
+                      nbspines = nbspines)  # crea data (spline)  
+  
+    data_sup_f <- data_acp_f({{var_supp}},
+                           centre = centre,
+                           plot = plot,
+                           nbspines = nbspines)
+  
   # grid d'eval
   time_grid <- seq(fdobj$basis$rangeval[1],
                    fdobj$basis$rangeval[2],
                    length.out = 500)
   
-  fdobj <- data_acp_f({{variable}},
-                      centre = centre,
-                      plot = plot,
-                      nbspines = nbspines)  # crea data (spline)
+
   acpf <- pca.fd(fdobj, nharm = nharm) # ACPf
   harm_eval <- eval.fd(time_grid, acpf$harmonics)
   
-  data_sup_f <- data_acp_f({{var_supp}},
-                           centre = centre,
-                           plot = plot,
-                           nbspines = nbspines)
   
   if(!supp_brut_harm){ # si on veut les harmoniques
     acpf_sup_f <- pca.fd(data_sup_f, nharm = nharm)
@@ -285,26 +220,34 @@ plot_var_supp_f <- function(variable, var_supp, supp_brut_harm = T,
   
   PC <- paste0("PC", axe)
   
+  print("!!!!!!!!!!  ATTENTION CA D2PEND BEAUCOUP DE NBSPLINES   !!!!!!!!")
+    
   coor_sup |> 
     ggplot(aes(xend = .data[[PC[1]]], yend = .data[[PC[2]]])) +
-    geom_segment(aes(x = 0, y = 0, xend = .data[[PC[1]]], yend = .data[[PC[2]]], color = exp),
-                 arrow = arrow(length = unit(0.3, "cm"), type = "closed"),
+    
+    geom_segment(aes(x = 0, y = 0,
+                     xend = .data[[PC[1]]], yend = .data[[PC[2]]],
+                     color = exp),
+                 arrow = arrow(length = unit(0.3, "cm"),
+                               type = "closed"),
                  linewidth = 1.2) +
+    
     geom_text(aes(x = .data[[PC[1]]], y = .data[[PC[2]]], label = exp),
               hjust = -0.2, vjust = -0.2) +
+    
     coord_fixed() +
+    
     geom_path(data=data.frame(x=cos(seq(0,2*pi,length.out=200)),
                               y=sin(seq(0,2*pi,length.out=200))),
               inherit.aes = FALSE, aes(x=x, y=y),
-              color="black", size=0.5) +
+              color="black", linewidth = 0.5) +
+    
     theme_minimal() +
+    
     labs(x = paste0("Dimension ", axe[1], " : ", round(acpf$varprop[axe[1]], 2)*100, "%"),
          y = paste0("Dimension ", axe[2], " : ", round(acpf$varprop[axe[2]], 2)*100, "%"),
          title = title)
-  
-  print("!!!!!!!!!!  ATTENTION CA D2PEND BEAUCOUP DE NBSPLINES   !!!!!!!!")
 }
-
 
 
 
@@ -317,9 +260,9 @@ nbspines = 30
 nharm = 5
 axe = c(1, 2)
 
+# TEMP_T_Q TEMP_GDD E.HYD_WSC RAYO_Cumul_RG
 
-
-plot_var_supp_f(variable = "TEMP_T_Q", var_supp = "E.HYD_WSC", supp_brut_harm = F, nbspines = 10, axe = c(1, 2))
+plot_var_supp_f(variable = "TEMP_GDD", var_supp = "E.HYD_WSC", supp_brut_harm = F, nbspines = 50, axe = c(1, 2))
 ```
 
 
