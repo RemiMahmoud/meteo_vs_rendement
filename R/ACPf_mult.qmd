@@ -261,8 +261,9 @@ nharm = 5
 axe = c(1, 2)
 
 # TEMP_T_Q TEMP_GDD E.HYD_WSC RAYO_Cumul_RG
-
-plot_var_supp_f(variable = "TEMP_GDD", var_supp = "E.HYD_WSC", supp_brut_harm = F, nbspines = 50, axe = c(1, 2))
+library(patchwork)
+plot_var_supp_f(variable = "TEMP_T_Q", var_supp = "E.HYD_WSC", supp_brut_harm = F, nbspines = 30, axe = c(1, 2)) |
+plot_var_supp_f(variable = "TEMP_T_Q", var_supp = "E.HYD_WSC", supp_brut_harm = F, nbspines = 10, axe = c(1, 2))
 ```
 
 
