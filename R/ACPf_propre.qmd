@@ -181,7 +181,7 @@ fun_acpf_plot <- function(variable,
                      centre = F, plot = T, nbspines = 30,
                      nharm = 5,
                      type_rend = "SY", var = "Aviso", axe = c(1, 2)){
-  
+
   fdobj <- data_acp_f({{variable}}, centre = centre, plot = plot, nbspines = nbspines)  # crea data (spline)
   acpf <- pca.fd(fdobj, nharm = nharm)                          # pca fun
   print("Le pourcentage d'explication de chaque axe de l'acpf est :")
@@ -193,10 +193,10 @@ fun_acpf_plot <- function(variable,
   plot_harmonique(acpf, 3)
   plot_harmonique(acpf, 4)
   plot_harmonique(acpf, 5)
-  plot_indiv(acpf, type_rend = type_rend, var = var, axe = c(1, 2), variable = variable)
+  plot_indiv(acpf, type_rend = type_rend, var = var, axe = axe, variable = variable)
 }
 
-fun_acpf_plot("TEMP_T_Q", nbspines = 10)
+fun_acpf_plot("RAYO_Cumul", nbspines = 20, axe = c(1, 2), type_rend = "SY")
 
 
 ```
