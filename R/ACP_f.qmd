@@ -162,7 +162,7 @@ plot_indiv <- function(acpf, type_rend = "SY", var = "Aviso", axe = c(1, 2), var
       theme_minimal() +
       scale_x_continuous(limits = c(-1000, 1000),breaks = seq(-1000, 1000, by = 200)) +
       scale_y_continuous(limits = c(-1000, 1000),breaks = seq(-1000, 1000, by = 200)) +
-      coord_fixed(ratio = 1, clip = "off") +
+      #coord_fixed(ratio = 1, clip = "off") +
       guides(color="none", size=guide_legend(title=paste0(type_rend))) +
       theme(aspect.ratio = 1,
             plot.title = element_text(size = 18, face = "bold"),
@@ -179,7 +179,7 @@ plot_indiv <- function(acpf, type_rend = "SY", var = "Aviso", axe = c(1, 2), var
         scores |> 
       ggplot(aes(x = .data[[V[1]]], y = 0)) +
       geom_point(aes(color = exp, size = value)) +
-      geom_hline(yintercept = 0, color = "grey68", linewidth = 0.6) + 
+      geom_hline(yintercept = 0, color = "grey68", linewidth = 0.6) +
       geom_vline(xintercept = 0, color = "grey68", linewidth = 0.6) +
       geom_text(aes(label = exp), vjust = -1) +  # nom des sites au-dessus
       theme_minimal() +
@@ -197,7 +197,7 @@ plot_indiv <- function(acpf, type_rend = "SY", var = "Aviso", axe = c(1, 2), var
   }
 }
 
-plot_indiv(pca,
+plot_indiv(acpf,
            type_rend = "SY",
            var = "Montego",
            axe = c(1, 2),
@@ -546,7 +546,6 @@ for (e in exps) {
 
 
 ```
-
 
 
 

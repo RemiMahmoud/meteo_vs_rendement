@@ -6,6 +6,7 @@ format: html
 ```{r library}
 library(tidyverse)
 library(fda)
+library(viridis)
 ```
 
 ```{r data}
@@ -87,41 +88,52 @@ fdobj <- data_acp_f(E.HYD_WSC, centre = F, plot = T)
 
 ```{r plot_harmonique}
 
-plot_harmonique <- function(acpf, i){
+plot_harmonique <- function(acpf, i, variable){
   fd_eval <- eval.fd(seq(11219, 11502, length.out = 100), acpf$harmonics[i])
   
   ylim <- range(fd_eval)
   num <- c("Première", "Deuxième", "Troisième", "Quatrième", "Cinquième")
+  saison <- c("AUTOMNE", "HIVER", "MONTAISON", "FLORAISON", "P300-P1000")
   
   plot(acpf$harmonics[i],
        main = paste(num[i], "composante principale fonctionnelle"),
-       xlab = "Temps",
-       ylab = "Valeur")  # humidité generale
+       xlab = "",
+       xaxt = "n",
+       ylab = paste("Valeur de la", num[i], "composante principale"))
+  
+  cols <- adjustcolor(
+  c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+  alpha.f = 0.25)
+  
   rect(ref_lm_v[-length(ref_lm_v)],  # xleft
        ylim[1],                # ybottom
        ref_lm_v[-1],               # xright
        ylim[2],                # ytop
-       col = c(
-         rgb(1, 0, 0, 0.15),
-         rgb(0, 1, 0, 0.15),
-         rgb(0, 0, 1, 0.15)
-       ),
+       col = cols,
        border = NA)
   
   y_text <- ylim[1] + 0.05 * diff(ylim)
   
-  text(ref_lm_v, y_text,
-       labels = periode_clim,
-       cex = 0.9, srt = 90,
+  x_centers <- (ref_lm_v[-length(ref_lm_v)] + ref_lm_v[-1]) / 2  # centre des rectangles
+  y_label <- ylim[1] - 0.1 * diff(ylim)                         # un peu en dessous
+  text(x = x_centers[1:length(saison)], 
+       y = y_label, 
+       labels = saison, 
+       cex = 0.9, 
        xpd = TRUE)
+  
 }
+
+#plot_harmonique(acpf, 1)  #humidité moyenne
+#plot_harmonique(acpf, 2)  #sec fin
+#plot_harmonique(acpf, 3)  # Humide début mais sec fin
 
 ```
 
 ajouter sum montego aviso
 ```{r plot_indiv}
 
-plot_indiv <- function(acpf, type_rend = "SY", var = "Aviso", axe = c(1, 2), variable){
+plot_indiv <- function(acpf, type_rend, var, axe, variable){
   
     V <- paste0("V" ,axe)
     
@@ -131,34 +143,59 @@ plot_indiv <- function(acpf, type_rend = "SY", var = "Aviso", axe = c(1, 2), var
       left_join(rendement |> 
               filter(type == type_rend,
                      variety == var))
-    
-    print(scores)
-    
-
+  
   if(length(axe) == 2){
 
     scores |> 
       ggplot(aes(x = .data[[V[1]]], y = .data[[V[2]]])) +
-      geom_point(aes(color = exp, size = value)) +  
-      geom_text(aes(label = exp), vjust = -1) +  # nom des sites au-dessus
+      geom_point(aes(color = exp, size = value)) +
+      geom_hline(yintercept = 0, color = "grey68", linewidth = 0.6) + 
+      geom_vline(xintercept = 0, color = "grey68", linewidth = 0.6) +
+      geom_text(aes(label = exp), vjust = -1) +
       theme_minimal() +
+      scale_x_continuous(limits = c(-1000, 1000),breaks = seq(-1000, 1000, by = 200)) +
+      scale_y_continuous(limits = c(-1000, 1000),breaks = seq(-1000, 1000, by = 200)) +
+      guides(color="none",
+              size=guide_legend(title=paste0(type_rend))) +
+      theme(aspect.ratio = 1,
+            plot.title = element_text(size = 18, face = "bold"),
+            axis.title = element_text(size = 16),
+            axis.text  = element_text(size = 14),
+            legend.title = element_text(size = 13),
+            legend.text  = element_text(size = 11))+
       labs(x = paste0("Dimension ", axe[1], " : ", round(acpf$varprop[axe[1]], 2)*100, "%"),
            y = paste0("Dimension ", axe[2], " : ", round(acpf$varprop[axe[2]], 2)*100, "%"),
-           title = paste0("Le rendement ", type_rend, " sur le plan de l'ACP (axes ", axe[1], " et ", axe[2], ") avec la variable ", as.character(variable)))
+           title = paste0("Le rendement ", type_rend, " sur le plan de l'ACP (axes ", axe[1], " et ", axe[2], ") avec la variable ", variable))
     
   }else if(length(axe) == 1){
     
         scores |> 
       ggplot(aes(x = .data[[V[1]]], y = 0)) +
-      geom_point(aes(color = exp, size = value)) +  
+      geom_point(aes(color = exp, size = value)) +
+      geom_hline(yintercept = 0, color = "grey68", linewidth = 0.6) +
+      geom_vline(xintercept = 0, color = "grey68", linewidth = 0.6) +
       geom_text(aes(label = exp), vjust = -1) +  # nom des sites au-dessus
       theme_minimal() +
+      scale_x_continuous(limits = c(-1000, 1000),breaks = seq(-1000, 1000, by = 200)) +
+      scale_y_continuous(limits = c(-1000, 1000),breaks = seq(-1000, 1000, by = 200)) +
+      guides(color="none", size=guide_legend(title=paste0(type_rend))) +
+      theme(aspect.ratio = 1,
+            plot.title = element_text(size = 18, face = "bold"),
+            axis.title = element_text(size = 16),
+            axis.text  = element_text(size = 14),
+            legend.title = element_text(size = 13),
+            legend.text  = element_text(size = 11))+
       labs(x = paste0("Dimension ", axe[1], " : ", round(acpf$varprop[axe[1]], 2)*100, "%"),
            y = "",
-           title = paste0("Le rendement ", type_rend, " sur l'axe de l'ACP (axe ", axe[1], ") avec la variable ", as.character(variable)))
+           title = paste0("Le rendement ", type_rend, " sur l'axe de l'ACP (axe ", axe[1], ") avec la variable ", variable))
     
   }
 }
+
+fdobj <- data_acp_f(E.HYD_WSC, centre = F, plot = T)
+acpf <- pca.fd(fdobj, nharm = 5) 
+plot_indiv(acpf,type_rend = "SY", var = "Montego", axe = c(1, 2), "E.HYD_WSC" )
+
 
 ```
 
@@ -183,21 +220,85 @@ fun_acpf_plot <- function(variable,
                      type_rend = "SY", var = "Aviso", axe = c(1, 2)){
 
   fdobj <- data_acp_f({{variable}}, centre = centre, plot = plot, nbspines = nbspines)  # crea data (spline)
-  acpf <- pca.fd(fdobj, nharm = nharm)                          # pca fun
+  acpf <- pca.fd(fdobj, nharm = nharm)                 # pca fun
+  
   print("Le pourcentage d'explication de chaque axe de l'acpf est :")
   print(round(acpf$varprop, 3) * 100)
+  
   # plot fonction moyenne
   plot(mean.fd(fdobj))
-  plot_harmonique(acpf, 1)   
+  
+  plot_harmonique(acpf, 1)
   plot_harmonique(acpf, 2)
   plot_harmonique(acpf, 3)
   plot_harmonique(acpf, 4)
   plot_harmonique(acpf, 5)
-  plot_indiv(acpf, type_rend = type_rend, var = var, axe = axe, variable = variable)
+  
+  plot_indiv(acpf, type_rend = type_rend, var = var, axe = axe, variable={{variable}} ) 
+  
 }
 
-fun_acpf_plot("RAYO_Cumul", nbspines = 20, axe = c(1, 2), type_rend = "SY")
+fun_acpf_plot("TEMP_T_Q")
 
 
+```
+
+
+```{r}
+plot_fdobj_experience <- function(fdobj, experience){
+  
+  saison <- c("AUTOMNE", "HIVER", "MONTAISON", "FLORAISON", "P300-P1000")
+  
+  fd_subset <- fdobj[experience]
+  
+  n <- length(experience)
+  cols <- viridis(n)
+  
+  par(mar = c(5, 4, 4, 8))
+  
+  plot(fd_subset,
+       col = cols, 
+       lty = 1, 
+       xlab = "", 
+       ylab = "Moyenne des températures",
+       main = "Courbes fonctionnelles estimées", 
+       xaxt = "n")
+  
+  colours <- adjustcolor(
+  c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+  alpha.f = 0.25)
+  
+  yl <- par("usr")[3:4]
+
+  rect(ref_lm_v[-length(ref_lm_v)],
+     yl[1],
+     ref_lm_v[-1],
+     yl[2],
+     col = colours,
+     border = NA)
+  
+  y_text <- yl + 0.05 * diff(yl)
+  
+  x_centers <- (ref_lm_v[-length(ref_lm_v)] + ref_lm_v[-1]) / 2  # centre des rectangles
+  y_label <- yl - 0.1 * diff(yl)            # un peu en dessous
+  text(x = x_centers[1:length(saison)], 
+       y = y_label, 
+       labels = saison, 
+       cex = 0.9, 
+       xpd = TRUE)
+  
+  legend("topright", 
+       legend = experience,
+       col = cols,
+       lty = 1,
+       cex = 0.7,
+       bty = "n",
+       xpd = TRUE,
+       inset = c(-0.2, 0), 
+       seg.len = 1.5)
+
+}
+
+plot_fdobj_experience(fdobj, c("INRA13", "INRA18", "INRA12", "BGA11","BGA15")) 
 ```
 
