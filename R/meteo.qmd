@@ -330,6 +330,17 @@ graph_TEMP_T_Q <- dt_meteo  |>
     limits = as.Date(c("2000-08-15", "2001-08-15"))
   )
 
+# graph_TEMP_GDD <- dt_meteo  |> 
+#   ggplot(aes(x = DATE_s, y = TEMP_GDD, color = exp, group = exp)) +
+#   geom_line() +
+#   theme_minimal() +
+#   labs(x = "Date", y = "Température moyenne") +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+#   scale_x_date(
+#     date_labels = "%d-%b",
+#     limits = as.Date(c("2000-08-15", "2001-08-15"))
+#   )
+
 graph_E.HYD_PRELIQ <- dt_meteo  |> 
   ggplot(aes(x = DATE_s, y = E.HYD_PRELIQ_Q, color = exp, group = exp)) +
   geom_line() +
@@ -385,6 +396,18 @@ graph_RAYO <- dt_meteo  |>
     limits = as.Date(c("2000-08-15", "2001-08-15"))
   )
 
+graph_RAYO_cumul <- dt_meteo  |> 
+ # filter(exp == "INRA18") |> 
+  ggplot(aes(x = DATE_s, y = RAYO_Cumul_RG, color = exp, group = exp)) +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Date", y = "Sum of Solar Irradiance") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_x_date(
+    date_labels = "%d-%b",
+    limits = as.Date(c("2000-08-15", "2001-08-15"))
+  )
+
 graph_Photoper <- dt_meteo  |> 
   ggplot(aes(x = DATE_s, y = Photoperiode, color = exp, group = exp)) +
   geom_line() +
@@ -397,11 +420,13 @@ graph_Photoper <- dt_meteo  |>
   )
 
 graph_TEMP_T_Q        # temp moyenne entre min et max
+graph_TEMP_GDD        # Temp cumulative
 graph_E.HYD_PRELIQ    # précipitation en mm
 graph_E.HYD_CUMMUL_P  # Cummul de précipitation en mm
 graph_E.HYD_ETAT      # reserve utile, quantité d'eau dans le sol
 graph_E.HYD_WSC       # quantité réélement pour la plante
 graph_RAYO            # Quantité de lumière par unité de surface recu
+graph_RAYO_cumul      # rayonement cumulatif
 graph_Photoper        # Durée jour / durée nuit
 
 
@@ -538,7 +563,7 @@ for (name in names(dts)){
 dts_lm <- imap_dfr(dts_lm_l, ~ mutate(exp = .y, .x)) |> 
   relocate(exp, .before = 1)
 
-#write.csv(dts_lm, "data/meteo_lm")
+# write.csv(meteo_lm, "data/meteo_lm")
 
 summary(dts_lm)
 
@@ -547,6 +572,16 @@ dts_lm$exp[which(is.na(dts_lm$DATE))]
 
 ```
 
+#fixe RAYO cumul RG
+```{r}
+
+dt_meteo <- dt_meteo |> 
+  group_by(exp) |> 
+  arrange(exp, DATE) |>    # important pour l’ordre du cumul
+  mutate(RAYO_Cumul = cumsum(RAYO_SSI_Q)) |> 
+  ungroup()
+
+```
 
 
 
