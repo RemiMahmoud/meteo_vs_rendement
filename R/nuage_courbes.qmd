@@ -57,54 +57,66 @@ plot(fdobj[c("INRA13", "TI13")])   # troisième comp
 ```
 
 ```{r}
-plot_fdobj_exp <- function(fdobj, exp){
+#library(viridis)
+
+
+plot_fdobj_experience <- function(fdobj, experience){
   
   saison <- c("AUTOMNE", "HIVER", "MONTAISON", "FLORAISON", "P300-P1000")
   
-  fd_subset <- fdobj[exp]
+  fd_subset <- fdobj[experience]
   
-  n <- length(exp)
+  n <- length(experience)
+  cols <- viridis(n)
   
-  cols <- rainbow(n)
+  par(mar = c(5, 4, 4, 8))
   
   plot(fd_subset,
        col = cols, 
        lty = 1, 
        xlab = "", 
        ylab = "Moyenne des températures",
-       main = "Courbes fonctionnelles estimées")
+       main = "Courbes fonctionnelles estimées", 
+       xaxt = "n")
   
   colours <- adjustcolor(
   c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
   alpha.f = 0.25)
   
-  rect(ref_lm_v[-length(ref_lm_v)],  # xleft
-       ylim[1],                # ybottom
-       ref_lm_v[-1],               # xright
-       ylim[2],                # ytop
-       col = colours,
-       border = NA)
+  yl <- par("usr")[3:4]
+
+  rect(ref_lm_v[-length(ref_lm_v)],
+     yl[1],
+     ref_lm_v[-1],
+     yl[2],
+     col = colours,
+     border = NA)
   
-  y_text <- ylim[1] + 0.05 * diff(ylim)
+  y_text <- yl + 0.05 * diff(yl)
   
   x_centers <- (ref_lm_v[-length(ref_lm_v)] + ref_lm_v[-1]) / 2  # centre des rectangles
-  y_label <- ylim[1] - 0.1 * diff(ylim)                         # un peu en dessous
+  y_label <- yl - 0.1 * diff(yl)                         # un peu en dessous
   text(x = x_centers[1:length(saison)], 
        y = y_label, 
        labels = saison, 
        cex = 0.9, 
        xpd = TRUE)
+  
+  legend("topright", 
+       legend = experience,
+       col = cols,
+       lty = 1,
+       cex = 0.7,
+       bty = "n",
+       xpd = TRUE,
+       inset = c(-0.2, 0), 
+       seg.len = 1.5)
 
 }
 
-plot_fdobj_exp(fdobj, c("INRA13", "INRA18")) 
+plot_fdobj_experience(fdobj, c("INRA13", "INRA18", "INRA12", "BGA11","BGA15")) 
 
 ```
 
 Faire appel aux landmarks de exp spécifiquement 
 ref_lm + rect
-
-```{r}
-
-```
-
