@@ -1,0 +1,362 @@
+---
+title: "reg_fun"
+format: html
+---
+
+```{r}
+
+library(fda)
+library(pfr)
+library(tidyverse)
+library(refund)
+library(pls)
+
+conflicted::conflicts_prefer(dplyr::filter, dplyr::select)
+
+```
+
+
+```{r data}
+
+rendement <- read.csv("data/rendement.csv") |>
+  select(-X) |> 
+  filter(type == "SY",
+         !is.na(value)) |>
+  mutate(variety = sub("^[^_]*_[^_]*_", "", variety))
+
+dt_meteo <- read.csv("data/meteo_lm") |> 
+  select(date_ref, exp, TEMP_T_Q, E.HYD_WSC, RAYO_Cumul_RG) |> 
+  mutate(date_ref = as.Date(date_ref)) |> 
+  pivot_wider(names_from = date_ref, values_from = c(TEMP_T_Q, E.HYD_WSC, RAYO_Cumul_RG))
+
+dta <- rendement |> 
+  left_join(dt_meteo)
+
+```
+
+
+```{r}
+
+
+# Exemple pour TEMP_T_Q :
+temp_data <- as.matrix(dt_meteo[, grep("TEMP_T_Q_", colnames(dt_meteo))])
+rownames(temp_data) <- dt_meteo$DATE_s
+
+# Créer un objet fdata
+temp_fdata <- fdata(temp_data, argvals = dt_meteo$DATE)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Y <- dta$value
+X1 <- as.matrix(dta[, 5:288])
+X2 <- as.matrix(dta[, 289:572])
+X3 <- as.matrix(dta[, 573:856])
+
+
+
+
+fd_mod <- pfr(
+      Y ~ lf(X1, k = Kx, bs = "ps") + lf(X2, k = Kx, bs = "ps"),
+      data = list(
+        Y = Y[1:20],
+        X1 = X1[1:20,],
+        X2 = X2[1:20,]      )
+    )
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+
+meteo_lm <- read.csv("data/meteo_lm") |>
+  select(DATE_s, exp, TEMP_T_Q, E.HYD_WSC, RAYO_Cumul_RG) |>
+  pivot_wider(names_from = exp, values_from = c(TEMP_T_Q, E.HYD_WSC, RAYO_Cumul_RG))
+
+meteo_lm$DATE_s <- as.Date(meteo_lm$DATE_s)
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+fun_model <- function(X, Y, Kx = 50, nfold = 10) {
+  
+  #Création des segments
+  segments <- cvsegments(length(Y), nfold)
+  
+  ### Modèle nul ###
+  #Création d'un vecteur pour le receuil des valeurs prédites
+  cvpred_nul <- numeric(length(Y))
+  print("a")
+  for (k in 1:nfold) {
+    print("b")
+    #Indices des observations pour l'ajustement (observations hors du segment k)
+    train_id <- setdiff(seq_len(length(Y)), segments[[k]])
+    #Indices des observations pour la prédiction (observations du segment k)
+    test_id  <- segments[[k]]
+    # Création du modèle nul qui est la moyenne de l'échantillon train
+    y_mean <- mean(Y[train_id])
+    # Prédiction sur l'échantillon test qui est donc la moyenne de l'échantillon train
+    cvpred_nul[test_id] <- y_mean
+  }
+  
+  #PRESS du modèle nul
+  PRESS_nul <- sum((Y - cvpred_nul)^2)
+  #MSEP du modèle nul
+  MSEP_nul <- mean((Y - cvpred_nul)^2)
+  #RMSEP du modèle nul
+  RMSEP_nul <- sqrt(MSEP_nul)
+  
+  ### Model fonctionnel ###
+  #création d'un vecteur qui contiendra les valeurs prédites
+  cvpred = numeric(length(Y))
+  #On ajuste le modèle sur tous les segments sauf le kième 
+  for (k in 1:nfold) {
+    #Indices des observations pour l'ajustement (observations hors du segment k)
+    train_id <- setdiff(seq_len(length(Y)), segments[[k]])
+    #Indices des observations pour la prédiction (observations du segment k)
+    test_id  <- segments[[k]]
+    #Ajustement du modèle sur l'echantillon train
+    fd_mod <- pfr(
+      Y ~ lf(X1, k = Kx, bs = "ps") + 
+        lf(X2, k = Kx, bs = "ps") + 
+        lf(X3, k = Kx, bs = "ps"),
+      data = list(
+        Y = Y[train_id],
+        X1 = X1[train_id,],
+        X2 = X2[train_id,],
+        X3 = X3[train_id,]
+      )
+    )
+    #prédiction sur l'échantillon test
+    cvpred[test_id] <- predict(
+      fd_mod,
+      newdata = list(X1 = X1[test_id,],
+                     X2 = X2[test_id,],
+                     X3 = X3[test_id,])
+    )
+  }
+  
+  #PRESS
+  PRESS <- sum((Y-cvpred)^2)
+  #MSEP
+  MSEP <- mean((Y-cvpred)^2)
+  #RMSEP
+  RMSEP <- sqrt(MSEP)
+  
+  ### Gain relative en % ###
+  err_relative <- (MSEP_nul - MSEP)/MSEP_nul*100
+  err_relative <- round(err_relative, 2)
+  
+  #Appel des sorties
+  #Liste contenant les résultats
+  result <- list()
+  #Appel du gain avec $err_relative
+  result$err_relative <- err_relative
+  #Appel de la MSEP avec $MSEP
+  result$MSEP <- round(MSEP, 2)
+  #Appel de la régression fonctionnelle en sortie de fonction avec $model_fun_out
+  result$model_fun_out <- fd_mod
+  #Appel des résidus des régressions avec $model_fun_residus
+  residus_vc <- Y - cvpred
+  result$model_fun_residus <- residus_vc
+  #Appel des prédictions avec $pred_fun_out
+  result$pred_fun_out <- cvpred
+  return(result)
+}
+
+# res_resid <- fun_model(X1, X2, X3, Y)
+
+
+
+
+```
+
+
+```{r}
+
+
+residus <- result$model_fun_residus
+pred <- result$pred_fun_out
+
+plot(pred, residus)
+
+
+#Représentation graphique résidus en fonction des prédictions
+plot_fun <- function(var) {
+  var_name <- deparse(substitute(var))
+  plot(table_pred[[var_name]], 
+       table_residus[[var_name]],
+       pch = 21,
+       bg = "red",
+       col = "black",
+       xlab = "Prédiction après VC",
+       ylab = "Résidus")
+}
+
+plot_fun(LWR)
+
+#ACP
+#ACP_res <- PCA(table_residus[c(-1)])
+
+
+```
+
+
+
+
+```{r}
+
+fd_mod_final <- pfr(
+      Y ~ lf(X1, k = Kx, bs = "ps") + 
+        lf(X2, k = Kx, bs = "ps"),
+      data = list(
+        Y = Y,
+        X1 = X1,
+        X2 = X2
+      )
+    )
+
+
+summary(fd_mod_final)
+plot(fd_mod_final)
+
+class(fd_mod_final$smooth$`s(X1.tmat):L.X1`)
+
+
+
+```
+
+ajouter les autres variables scalaires
+comprendre bien la sorti de pfr et fun_model
+refaire fun_model plus propre pour notre cas, prends toutes les données, et la var à expliquer, choisi si on prend les données ou les axes de l'ACP
+sort le rmsep, gain relatif (pour la cv)
+qualité avec le modèle complet, gain relatif complet
+plot des betas et des gammas avec les couleurs des périodes
+
+
+
+```{r}
+
+ref_fun <- function()
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ TU fais quoi ???
+```{r}
+
+#Graphique de la fonction des beta
+res_model <- lapply(Y_cols, function(i) {
+  Y <- NIRS_pheno_f[[i]]
+  res_model <- fun_model(X, Y)
+  model <- res_model$model_fun_out
+})
+
+names(res_model) <- colnames(NIRS_pheno_f[Y_cols])
+
+#Représentation graphique des fonctions des beta
+bhat.lf <- coef(res_model[["SR"]], n=100)
+bhat.lf$upper <- bhat.lf$value + 1.96*bhat.lf$se
+bhat.lf$lower <- bhat.lf$value - 1.96*bhat.lf$se
+fda::matplot(bhat.lf$X.argvals, bhat.lf[,c(2, 4, 5)], 
+        type = "l",
+        ylab=expression(paste(beta(t))), xlab="t")
+```
+
