@@ -104,11 +104,11 @@ data_sup <- rendement |>
 
 ```{r fonction var sup}
 plot_var_supp <- function(variable,
-                     centre = F, plot = F, nbspines = 30,
-                     data_sup, nharm = 5, axe = c(1, 2)){
+                          centre = F, plot = F, nbspines = 30,
+                          data_sup, nharm = 5, axe = c(1, 2)){
   
   fdobj <- data_acp_f({{variable}}, centre = centre, plot = plot, nbspines = nbspines)  # crea data (spline)
-
+  
   
   # selection les exp sans données manquantes
   data_sup_ok <- data_sup |> 
@@ -150,8 +150,8 @@ plot_var_supp <- function(variable,
               color="black", size=0.5) +
     theme_minimal() +
     labs(x = paste0("Dimension ", axe[1], " : ", round(acpf$varprop[axe[1]], 2)*100, "%"),
-           y = paste0("Dimension ", axe[2], " : ", round(acpf$varprop[axe[2]], 2)*100, "%"),
-           title = paste0("Le cercle de correlation des variables supplémentaire"))
+         y = paste0("Dimension ", axe[2], " : ", round(acpf$varprop[axe[2]], 2)*100, "%"),
+         title = paste0("Le cercle de correlation des variables supplémentaire"))
 }
 
 ```
@@ -177,7 +177,7 @@ plot_var_supp_f <- function(variable, var_supp, supp_brut_harm = T,
                       plot = plot,
                       nbspines = nbspines)  # crea data (spline)  
   
-    data_sup_f <- data_acp_f({{var_supp}},
+  data_sup_f <- data_acp_f({{var_supp}},
                            centre = centre,
                            plot = plot,
                            nbspines = nbspines)
@@ -187,7 +187,7 @@ plot_var_supp_f <- function(variable, var_supp, supp_brut_harm = T,
                    fdobj$basis$rangeval[2],
                    length.out = 500)
   
-
+  
   acpf <- pca.fd(fdobj, nharm = nharm) # ACPf
   harm_eval <- eval.fd(time_grid, acpf$harmonics)
   
@@ -207,7 +207,7 @@ plot_var_supp_f <- function(variable, var_supp, supp_brut_harm = T,
                    axe[1], " et ", axe[2],
                    ") de", variable)
   }
-
+  
   
   # coor_sup : matrice corrélations
   coor_sup <- apply(sup_eval, 2, function(f) {
@@ -221,7 +221,7 @@ plot_var_supp_f <- function(variable, var_supp, supp_brut_harm = T,
   PC <- paste0("PC", axe)
   
   print("!!!!!!!!!!  ATTENTION CA D2PEND BEAUCOUP DE NBSPLINES   !!!!!!!!")
-    
+  
   coor_sup |> 
     ggplot(aes(xend = .data[[PC[1]]], yend = .data[[PC[2]]])) +
     
@@ -263,7 +263,7 @@ axe = c(1, 2)
 # TEMP_T_Q TEMP_GDD E.HYD_WSC RAYO_Cumul_RG
 library(patchwork)
 plot_var_supp_f(variable = "TEMP_T_Q", var_supp = "E.HYD_WSC", supp_brut_harm = F, nbspines = 30, axe = c(1, 2)) |
-plot_var_supp_f(variable = "TEMP_T_Q", var_supp = "E.HYD_WSC", supp_brut_harm = F, nbspines = 10, axe = c(1, 2))
+  plot_var_supp_f(variable = "TEMP_T_Q", var_supp = "E.HYD_WSC", supp_brut_harm = F, nbspines = 10, axe = c(1, 2))
 ```
 
 
