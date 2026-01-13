@@ -284,7 +284,7 @@ dts = dts[order(names(dts))] |>  lapply(function(dt) {
 
 dt_meteo <- imap_dfr(dts, ~ mutate(exp = .y, .x))
 
-write.csv(dt_meteo, "data/meteo_brute.csv")
+# write.csv(dt_meteo, "data/meteo_brute.csv")
 
 rm(INRA11,BGA11,INRA12,INRA13,TI13,EUR14,SYN14,MAD14,RAGT14,TI15,LIM15,SYN15,INRA15,BGA15,RAGT15,MAD15,INRA16,INRA17,INRA18,EUR18, read_meteo)
 
@@ -560,7 +560,7 @@ for (name in names(dts)){
 dts_lm <- imap_dfr(dts_lm_l, ~ mutate(exp = .y, .x)) |> 
   relocate(exp, .before = 1)
 
-# write.csv(dt_meteo, "data/meteo_lm")
+# write.csv(dts_lm, "data/meteo_lm")
 
 summary(dts_lm)
 
