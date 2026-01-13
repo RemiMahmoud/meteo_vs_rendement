@@ -196,7 +196,7 @@ fun_acpf_plot <- function(variable,
   plot_indiv(acpf, type_rend = type_rend, var = var, axe = axe, variable = variable)
 }
 
-fun_acpf_plot("RAYO_Cumul", nbspines = 20, axe = c(1, 2), type_rend = "SY")
+fun_acpf_plot("TEMP_T_Q", nbspines = 20, axe = c(1, 3), type_rend = "SY")
 
 
 ```
