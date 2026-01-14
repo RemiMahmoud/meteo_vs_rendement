@@ -3,7 +3,7 @@ title: "reg_fun"
 format: html
 ---
 
-```{r}
+```{r library}
 
 library(fda)
 # library(pfr)
@@ -13,6 +13,19 @@ library(pls)
 
 conflicted::conflicts_prefer(dplyr::filter, dplyr::select)
 
+```
+
+
+
+```{r nom}
+noms <- c("INRA11","BGA11",
+          "INRA12",
+          "INRA13","TI13",
+          "EUR14","SYN14","MAD14","RAGT14",
+          "TI15","LIM15","SYN15","INRA15","BGA15","RAGT15","MAD15",
+          "INRA16",
+          "INRA17",
+          "INRA18","EUR18")
 ```
 
 
@@ -29,12 +42,413 @@ dt_meteo <- read.csv("data/meteo_lm") |>
   mutate(date_ref = as.Date(date_ref)) |> 
   pivot_wider(names_from = date_ref, values_from = c(TEMP_T_Q, E.HYD_WSC, RAYO_Cumul_RG))
 
-info <- read.csv("data/dt_anova")
+info <- read.csv("data/dt_anova") |> 
+  rename(exp = PARTENAIRE,
+         year = Year.a.) |> 
+  select(exp, year, Latitude, Longitude, AN, ADB, NNI, Ntotal, WSC_MAX, WSC_I, DBI, DAI, RO, RF)
+
+landmark <- read.csv("data/landmarks.csv") |> 
+  rename(exp = PARTENAIRE) |> 
+  select(exp, DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P) # attention à duree flo
 
 dta <- rendement |> 
-  left_join(dt_meteo)
+  select(exp, type, value, variety) |> 
+  left_join(info) |> 
+  left_join(landmark) |> 
+  left_join(dt_meteo) |> 
+  arrange(match(exp, noms)) |> 
+  filter(!is.na(year)) |> 
+  mutate(variety = as.factor(variety),
+         year = as.factor(year))
 
 ```
+
+
+```{r data regression}
+
+
+```
+
+
+x  ajouter les autres variables scalaires
+comprendre bien la sorti de pfr et fun_model et diff avec fRegress, et la pénalisation
+refaire fun_model plus propre pour notre cas, prends toutes les données, et la var à expliquer, choisi si on prend les données ou les axes de l'ACP, choix des variables 
+sort le rmsep, gain relatif (pour la cv)
+qualité avec le modèle complet, gain relatif complet
+plot des betas et des gammas avec les couleurs des périodes
+
+
+
+
+
+
+```{r}
+
+
+Y <- dta$value
+X1 <- as.matrix(dta[, 23:306])
+X2 <- as.matrix(dta[, 307:590])
+X3 <- as.matrix(dta[, 591:874])
+X_f <- list(X1 = X1, X2 = X2, X3 = X3)
+X_s = as.list(dta[, 4:22])
+Kx = 30
+nfold = 10
+
+data_var <- X_f[[1]]
+
+reg <- fRegress(Y, X_f = list(), X_s = list(), brute = T, nbsplines = 30, date = 11219:11502){
+  
+  ##### donnée fonctionelle en spline #####
+  
+  rangeval <- c(min(date), max(date)) # définition de l'échelle (les longueurs d'ondes)
+  nbasis <- nbsplines # Nombre de splines utilisées
+  basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis)
+  fdParobj <- fdPar(basisobj, lambda = 1e-3)
+  
+  
+  X_f_fd <- lapply(X_f, function(data_var) {
+    m <- apply(data_var, 1, mean)
+    s <- apply(data_var - m, 1, sd)
+    
+    data_var <- (data_var - m) / s 
+    data_var <- as.matrix(data_var) 
+    
+    fdParobj <- fdPar(basisobj, lambda = 1e-3)
+    
+    fdsmooth <- smooth.basis(
+      argvals  = date,
+      y        = t(data_var),  # smooth.basis attend temps × individus
+      fdParobj = fdParobj
+    )
+    
+    
+    if(!brute){
+      
+    }
+    return(fdsmooth$fd)
+  })
+  
+  
+  
+  ##### data regression #####
+  
+  beta_basis <- create.bspline.basis(rangeval, nbasis = 15)
+  
+  betalist <- lapply(seq_along(X_f_fd), function(j) {
+    fdPar(beta_basis, lambda = 1e-1)
+  })
+  
+  
+  zmat <- if (length(X_s) > 0) {
+    do.call(cbind, X_s)
+  } else {
+    NULL
+  } 
+  
+  reg <- fRegress(
+    y        = Y,
+    xfdlist  = X_f_fd,
+    betalist = betalist,
+    zmat     = zmat
+  )
+  
+  reg$betaestlist[[1]]$fd #Coefficients fonctionnels
+  Y_hat <- reg$yhatfdobj #val ajusté
+  res <- Y - reg$yhatfdobj # residu
+  sqrt(mean((Y - res)^2))
+  
+  plot(reg$betaestlist[[3]]$fd,
+       xlab = "Temps",
+       ylab = expression(beta(t)),
+       main = "Coefficient fonctionnel β(t)")
+}
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+
+
+
+reg_fun <- function(Y, X_f = list(), X_s = list(), brut = F, Kx = 30, test = F, nfold = 10){
+  
+  
+  p_f <- length(X_f)
+  p_s <- length(X_s)
+  
+  X_names_f <- if (length(X_f)!=0){paste0("X_f", seq_len(p_f))} else {character(0)}
+  X_names_s <- if (length(X_s)!=0){paste0("X_s", seq_len(p_s))} else {character(0)}
+  
+  # Construire la partie droite de la formule
+  formule_f <- paste(paste0("lf(", X_names_f, ", k = ", Kx, ", bs = 'ps')"),
+                     collapse = " + ")
+  
+  formule_s <- paste(paste0(X_names_s), collapse = " + ")
+  
+  if (p_f + p_s == 0){
+    stop("Formule vide")
+  } else if (p_f * p_s == 0) {
+    formule <- paste0(formule_f, formule_s)
+  } else {
+    formule <- paste0(formule_f, formule_s,
+                      collapse = " + ")
+  }
+  
+  # Formule complète
+  formule <- as.formula(paste("Y ~", formule))
+  
+  # Données pour pfr()
+  data_list <- c(list(Y = Y), setNames(X_f, X_names_f), setNames(X_s, X_names_s))
+  
+  
+  
+  fd_mod_final <- pfr(
+    formula = formule,
+    data = data_list
+  )
+  
+}
+```
+
+
+```{r}
+
+
+
+reg_fun <- function(Y, X_f = list(), X_s = list(), brut = F, Kx = 30, test = F, nfold = 10){
+  
+  
+  p_f <- length(X_f)
+  p_s <- length(X_s)
+  
+  X_names_f <- if (length(X_f)!=0){paste0("X_f", seq_len(p_f))} else {character(0)}
+  X_names_s <- if (length(X_s)!=0){paste0("X_s", seq_len(p_s))} else {character(0)}
+  
+  # Construire la partie droite de la formule
+  formule_f <- paste(paste0("lf(", X_names_f, ", k = ", Kx, ", bs = 'ps')"),
+                     collapse = " + ")
+  
+  formule_s <- paste(paste0(X_names_s), collapse = " + ")
+  
+  if (p_f + p_s == 0){
+    stop("Formule vide")
+  } else if (p_f * p_s == 0) {
+    formule <- paste0(formule_f, formule_s)
+  } else {
+    formule <- paste0(formule_f, formule_s,
+                      collapse = " + ")
+  }
+  
+  # Formule complète
+  formule <- as.formula(paste("Y ~", formule))
+  
+  # Données pour pfr()
+  data_list <- c(list(Y = Y), setNames(X_f, X_names_f), setNames(X_s, X_names_s))
+  
+  
+  segments <- cvsegments(length(Y), nfold)
+  cvpred_nul <- numeric(length(Y))
+  cvpred <- numeric(length(Y))
+  
+  for (k in 1:nfold) {
+    # indice
+    train_id <- setdiff(seq_len(length(Y)), segments[[k]])
+    test_id  <- segments[[k]]
+    # modèle nul
+    y_mean <- mean(Y[train_id])
+    cvpred_nul[test_id] <- y_mean
+    # reg func
+    data_list_train <- lapply(data_list, function(x) {
+      if (is.null(dim(x))) {
+        # vecteur
+        x[train_id]
+      } else {
+        # matrice ou data.frame
+        x[train_id, , drop = FALSE]
+      }
+    })
+    
+    data_list_train <- lapply(data_list, function(x) {
+      if (is.null(dim(x))) {
+        # vecteur
+        x[test_id]
+      } else {
+        # matrice ou data.frame
+        x[test_id, , drop = FALSE]
+      }
+    })
+    
+    fd_mod_final <- pfr(
+      formula = formule,
+      data = data_list_train
+    )
+    
+    cvpred[test_id] <- predict(
+      fd_mod_final,
+      newdata = data_list_test
+    )
+  }
+  
+  # RMSEP mod nul
+  PRESS_nul <- sum((Y - cvpred_nul)^2)
+  MSEP_nul <- mean((Y - cvpred_nul)^2)
+  RMSEP_nul <- sqrt(MSEP_nul)
+  
+  
+  # RMSEP mod reg fun
+  PRESS <- sum((Y - cvpred)^2)
+  MSEP <- mean((Y - cvpred)^2)
+  RMSEP <- sqrt(MSEP)
+  
+  # gain relatif
+  err_relative <- round((MSEP_nul - MSEP)/MSEP_nul*100, 2)
+  
+  result <- list()
+  #Appel du gain avec $err_relative
+  result$err_relative <- err_relative
+  #Appel de la MSEP avec $MSEP
+  result$MSEP <- round(MSEP, 2)
+  #Appel de la régression fonctionnelle en sortie de fonction avec $model_fun_out
+  result$model_fun_out <- fd_mod_final
+  #Appel des résidus des régressions avec $model_fun_residus
+  result$model_fun_residus <- Y - cvpred
+  #Appel des prédictions avec $pred_fun_out
+  result$pred_fun_out <- cvpred
+  return(result)
+}
+
+
+
+```
+
+
+
+```{r}
+
+
+Y <- dta$value
+X1 <- as.matrix(dta[, 5:288])
+X2 <- as.matrix(dta[, 289:572])
+X3 <- as.matrix(dta[, 573:856])
+X_f <- list(X1 = X1, X2 = X2, X3 = X3)
+X_s = list()
+Kx = 30
+nfold = 10
+
+
+
+data_list_train <- c(
+  list(Y = Y[train_id]),
+  if (length(X_f) > 0)
+    setNames(lapply(X_f, function(x) as.matrix(x[train_id])), X_names_f)
+  else
+    list(),
+  if (length(X_s) > 0)
+    setNames(lapply(X_s, function(x) as.matrix(x[train_id])), X_names_s)
+  else
+    list()
+)
+
+
+plot(reg_fun(Y, X_f))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ```{r}
@@ -265,211 +679,6 @@ class(fd_mod_final$smooth$`s(X1.tmat):L.X1`)
 
 
 ```
-
-ajouter les autres variables scalaires
-comprendre bien la sorti de pfr et fun_model
-refaire fun_model plus propre pour notre cas, prends toutes les données, et la var à expliquer, choisi si on prend les données ou les axes de l'ACP, choix des variables 
-sort le rmsep, gain relatif (pour la cv)
-qualité avec le modèle complet, gain relatif complet
-plot des betas et des gammas avec les couleurs des périodes
-
-
-
-```{r}
-
-
-
-reg_fun <- function(Y, X_f = list(), X_s = list(), brut = F, Kx = 30, test = F, nfold = 10){
-  
-  
-  p_f <- length(X_f)
-  p_s <- length(X_s)
-  
-  X_names_f <- if (length(X_f)!=0){paste0("X_f", seq_len(p_f))} else {character(0)}
-  X_names_s <- if (length(X_s)!=0){paste0("X_s", seq_len(p_s))} else {character(0)}
-  
-  # Construire la partie droite de la formule
-  formule_f <- paste(paste0("lf(", X_names_f, ", k = ", Kx, ", bs = 'ps')"),
-                     collapse = " + ")
-  
-  formule_s <- paste(paste0(X_names_s), collapse = " + ")
-  
-  if (p_f + p_s == 0){
-    stop("Formule vide")
-  } else if (p_f * p_s == 0) {
-    formule <- paste0(formule_f, formule_s)
-  } else {
-    formule <- paste0(formule_f, formule_s,
-                      collapse = " + ")
-  }
-  
-  # Formule complète
-  formule <- as.formula(paste("Y ~", formule))
-  
-  # Données pour pfr()
-  data_list <- c(list(Y = Y), setNames(X_f, X_names_f), setNames(X_s, X_names_s))
-  
-  
-  segments <- cvsegments(length(Y), nfold)
-  cvpred_nul <- numeric(length(Y))
-  cvpred <- numeric(length(Y))
-  
-  for (k in 1:nfold) {
-    # indice
-    train_id <- setdiff(seq_len(length(Y)), segments[[k]])
-    test_id  <- segments[[k]]
-    # modèle nul
-    y_mean <- mean(Y[train_id])
-    cvpred_nul[test_id] <- y_mean
-    # reg func
-    data_list_train <- lapply(data_list, function(x) {
-      if (is.null(dim(x))) {
-        # vecteur
-        x[train_id]
-      } else {
-        # matrice ou data.frame
-        x[train_id, , drop = FALSE]
-      }
-    })
-    
-    data_list_train <- lapply(data_list, function(x) {
-      if (is.null(dim(x))) {
-        # vecteur
-        x[test_id]
-      } else {
-        # matrice ou data.frame
-        x[test_id, , drop = FALSE]
-      }
-    })
-    
-    fd_mod_final <- pfr(
-      formula = formule,
-      data = data_list_train
-    )
-    
-    cvpred[test_id] <- predict(
-      fd_mod_final,
-      newdata = data_list_test
-    )
-  }
-  
-  # RMSEP mod nul
-  PRESS_nul <- sum((Y - cvpred_nul)^2)
-  MSEP_nul <- mean((Y - cvpred_nul)^2)
-  RMSEP_nul <- sqrt(MSEP_nul)
-  
-  
-  # RMSEP mod reg fun
-  PRESS_nul <- sum((Y - cvpred)^2)
-  MSEP_nul <- mean((Y - cvpred)^2)
-  RMSEP_nul <- sqrt(MSEP)
-  
-  # gain relatif
-  err_relative <- round((MSEP_nul - MSEP)/MSEP_nul*100, 2)
-  
-  result <- list()
-  #Appel du gain avec $err_relative
-  result$err_relative <- err_relative
-  #Appel de la MSEP avec $MSEP
-  result$MSEP <- round(MSEP, 2)
-  #Appel de la régression fonctionnelle en sortie de fonction avec $model_fun_out
-  result$model_fun_out <- fd_mod_final
-  #Appel des résidus des régressions avec $model_fun_residus
-  result$model_fun_residus <- Y - cvpred
-  #Appel des prédictions avec $pred_fun_out
-  result$pred_fun_out <- cvpred
-  return(result)
-}
-
-
-
-```
-
-
-
-```{r}
-
-
-Y <- dta$value
-X1 <- as.matrix(dta[, 5:288])
-X2 <- as.matrix(dta[, 289:572])
-X3 <- as.matrix(dta[, 573:856])
-X_f <- list(X1 = X1, X2 = X2, X3 = X3)
-X_s = list()
-Kx = 30
-nfold = 10
-
-
-
-data_list_train <- c(
-  list(Y = Y[train_id]),
-  if (length(X_f) > 0)
-    setNames(lapply(X_f, function(x) as.matrix(x[train_id])), X_names_f)
-  else
-    list(),
-  if (length(X_s) > 0)
-    setNames(lapply(X_s, function(x) as.matrix(x[train_id])), X_names_s)
-  else
-    list()
-)
-
-
-plot(reg_fun(Y, X_f))
-
-```
-
-
-```{r}
-
-
-reg_fun <- function(Y, X_f = list(), X_s = list(), brut = F, Kx = 30, test = F, nfold = 10){
-  
-  
-  p_f <- length(X_f)
-  p_s <- length(X_s)
-  
-  X_names_f <- if (length(X_f)!=0){paste0("X_f", seq_len(p_f))} else {character(0)}
-  X_names_s <- if (length(X_s)!=0){paste0("X_s", seq_len(p_s))} else {character(0)}
-  
-  # Construire la partie droite de la formule
-  formule_f <- paste(paste0("lf(", X_names_f, ", k = ", Kx, ", bs = 'ps')"),
-                     collapse = " + ")
-  
-  formule_s <- paste(paste0(X_names_s), collapse = " + ")
-  
-  if (p_f + p_s == 0){
-    stop("Formule vide")
-  } else if (p_f * p_s == 0) {
-    formule <- paste0(formule_f, formule_s)
-  } else {
-    formule <- paste0(formule_f, formule_s,
-                      collapse = " + ")
-  }
-  
-  # Formule complète
-  formule <- as.formula(paste("Y ~", formule))
-  
-  # Données pour pfr()
-  data_list <- c(list(Y = Y), setNames(X_f, X_names_f), setNames(X_s, X_names_s))
-  
-  
-  
-  fd_mod_final <- pfr(
-    formula = formule,
-    data = data_list
-  )
-  
-}
-```
-
-
-
-
-
-
-
-
-
 
 
 
