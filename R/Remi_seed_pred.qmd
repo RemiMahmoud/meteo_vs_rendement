@@ -1,0 +1,1181 @@
+---
+title: "Prédiction à partir de spectres NIRS graines"
+format: html
+editor: source
+---
+
+```{r library}
+# rm(list = ls())
+library(readr)
+library(tidyverse)
+library(randomForest)
+library(fda)
+library(fda.usc)
+conflicted::conflict_prefer("select", "dplyr")
+conflicted::conflict_prefer("filter", "dplyr")
+```
+
+## Graines
+
+On commence par importer les données brutes.
+
+```{r importatoin_raw_seed}
+graines <- read.table("data/NIRS_data/NIRS_experiment/Graines/matrice_nirs_seeds_paneltotal_ready202307.csv", sep = ";", dec = ",", header = T)
+
+# Ce dataset semble identique au précédent, sans colonnes explicatives supplémentaires
+# graines_test <- read.table("data/NIRS_experiment/Graines/NIRS_seeds.csv", sep = ",", dec = ".", header = T)
+
+dim(graines %>% distinct(Genotype)) # Il y a 210 génotype
+
+# gestion des classe des variables
+graines$X <- as.factor(graines$X)
+graines$Genotype <- as.factor(graines$Genotype)
+graines$Rep <- as.factor(graines$Rep)
+graines$Type <- as.factor(graines$Type)
+graines[,-c(1:4)] <- graines[,-c(1:4)] %>% mutate(across(everything(), as.numeric))
+
+# Changement des noms de colonnes (pour le pivot_longer)
+colnames(graines) <- as.character(c("X", "Genotype", "Rep", "Type", 800:2781))
+```
+
+Une fois les données importées, on transforme ce dataset pour pouvoir afficher les courbes.
+
+```{r scale_seed}
+
+# On va centrer et réduire les spectres
+snv <- t(scale(t(graines[,-c(1:4)])))
+snv <- as.data.frame(snv)
+snv <- cbind(graines[,c(1:4)], snv)
+
+# Création d'un jeu de données que l'on peut plot
+# graines_plot <- snv %>% pivot_longer(-c(1:4), 
+#                                          names_to = "Wavenumber", 
+#                                          values_to = "Absorbance")
+# graines_plot$Wavenumber <- as.numeric(graines_plot$Wavenumber)
+
+# Downsampling du dataset pour des plots plus rapides
+# id_subsample <- graines_plot %>% 
+#   distinct(Type, Genotype, Rep) %>% 
+#   slice_sample(prop = .1, by = c(Type, Rep) ) %>% 
+#   select(Genotype)
+
+# graines_plot_subsample <- graines_plot %>% 
+#   inner_join(id_subsample)
+
+
+```
+
+On importe aussi les jeux de données correspondant aux différentes corrections apportées (*cf thèse*)
+
+```{r seed_correction}
+# Correction 1
+graines_MEAN <- read.table("data/NIRS_data/NIRS_experiment/Graines/nirs_seeds_mean.csv", sep = ",", dec = ".", header = T, stringsAsFactors = T)
+
+# rename des colonnes
+colnames(graines_MEAN) <- c("Genotype", 817:2764)
+
+# Correction 3
+graines_BLUP <- read.table("data/NIRS_data/NIRS_experiment/Graines/nirs_seeds_BLUP.csv", sep = ",", dec = ".", header = T)
+graines_BLUP$X <- as.factor(graines_BLUP$X)
+colnames(graines_BLUP) <- c("Genotype", 817:2763)
+
+
+
+```
+
+Dans le jeu de donnée BLUP, les lignes et les colonnes ne sont pas nommées. Or il y a une colonne (une longueur d'onde) de moins que dans le jeu de donnée MEAN.
+
+```{r adjust_wavelength}
+# on veut rename les colonnes, mais on ne sait pas si ce sont les bonnes longueur d'ondes. On passe de 1948 à 1947 longueurs d'onde.
+
+# on supprime la dernière longueur d'onde
+colnames(graines_BLUP) <- c("Genotype", 817:2763)
+
+# on va afficher les 2 premières courbes pour voir si il y a un décallage dans les longueurs d'ondes
+rbind(graines_MEAN[1, -1949], graines_BLUP[1, ]) %>%
+  mutate(group = c("MEAN", "BLUP")) %>%
+  pivot_longer(cols = -c(Genotype, group),
+               names_to = "wavelength",
+               values_to = "Abs") %>%
+  mutate(wavelength = as.numeric(wavelength)) %>% 
+  group_by(group) %>% 
+  ggplot(aes(x = wavelength, y = Abs, col = group))+
+  geom_line(aes(group = group))
+
+# on essaye en supprimant la première longueur d'onde pour être sûr
+colnames(graines_BLUP) <- c("Genotype", 818:2764)
+
+rbind(graines_MEAN[1, -2], graines_BLUP[1, ]) %>%
+  mutate(group = c("MEAN", "BLUP")) %>%
+  pivot_longer(cols = -c(Genotype, group),
+               names_to = "wavelength",
+               values_to = "Abs") %>%
+  mutate(wavelength = as.numeric(wavelength)) %>% 
+  group_by(group) %>% 
+  ggplot(aes(x = wavelength, y = Abs, col = group))+
+  geom_line(aes(group = group))
+
+colnames(graines_BLUP) <- c("Genotype", 817:2763)
+```
+
+On voit clairement un décallage entre les 2 courbes. On suppose donc que dans graines_BLUP, il manque la dernière longueur d'onde. C'est ce qui a été modifié plus haut.
+
+## Phénotypes
+
+
+
+### Importation
+
+Interprétation des noms de colonnes table 1 p43
+
+```{r}
+
+pheno_VG = read_delim("data/Pheno/Germination/VG_GWAS_pheno.csv", delim = ";")
+# pheno_VG_july_2023 = read_delim("data/Pheno/Germination/VG_ready_GWAS_juillet2023.csv", delim = ";")
+
+# On isole les génotypes de rutabagas
+genotype_rutabaga <- graines %>% filter(Type == "Swede") %>%
+  distinct(Genotype) 
+
+
+pheno_VG = pheno_VG %>% 
+  anti_join(genotype_rutabaga)
+
+
+
+
+```
+
+
+### Exploration
+
+```{r}
+
+library(naniar)
+
+vis_miss(pheno_VG)
+
+
+# NAs removal
+
+pheno_VG = drop_na(pheno_VG)
+```
+
+
+```{r}
+library(FactoMineR)
+library(factoextra)
+library(patchwork)
+
+
+pheno_VG_PCA = column_to_rownames(pheno_VG %>% mutate(Genotype = str_remove(Genotype, "NAVIG_")), var ="Genotype") %>% as.matrix
+mod.pca = PCA(pheno_VG_PCA, graph = FALSE )
+
+
+
+plot_var = fviz_pca_var(mod.pca)
+plot_ind = fviz_pca_ind(mod.pca)
+plot_contrib_var = fviz_contrib(mod.pca, "var")
+plot_contrib_ind = fviz_contrib(mod.pca, "ind", top = 10)
+plot_contrib_var_2 = fviz_contrib(mod.pca, "var", axes = 2)
+plot_contrib_ind_2 = fviz_contrib(mod.pca, "ind", top = 10, axes = 2)
+
+
+(plot_var | plot_ind) /(plot_contrib_var |plot_contrib_ind)/(plot_contrib_var_2 |plot_contrib_ind_2)
+
+
+
+
+```
+
+
+```{r}
+
+
+NIRS_graines = graines_MEAN %>% 
+  filter(Genotype %in% pheno_VG$Genotype) 
+
+NIRS_graines_SNV = t(scale(t(NIRS_graines[,-c(1)])))
+
+pheno_VG_pred = pheno_VG %>% 
+  filter(Genotype %in% NIRS_graines$Genotype) 
+
+
+
+```
+
+
+
+
+
+
+
+
+
+## Prédiction
+
+
+On compare plusieurs méthodes entre elles sur plusieurs phénotypes. 
+Les méthodes testées sont:
+
+* PLS
+* FPLS
+* Functional regression
+* Random forest
+
+```{r prepare data}
+
+
+
+
+full_data = NIRS_graines %>%
+  left_join(pheno_VG)
+
+
+full_data_train = NIRS_graines %>% 
+  left_join(pheno_VG) %>% 
+  slice_sample(prop = .8)
+
+full_data_test = full_data %>% anti_join(full_data_train)
+```
+
+
+```{r freg}
+
+fit_freg_train_test = function(data_NIRS_train, data_NIRS_test, pheno_var, nbasis = 25){
+  
+  
+  
+  
+  # Extraire la matrice NIRS (lignes = individus, colonnes = longueurs d'onde)
+  X_mat_train <- as.matrix(data_NIRS_train[, grep("^[0-9]+$", colnames(data_NIRS_train))])
+  X_mat_test <- as.matrix(data_NIRS_test[, grep("^[0-9]+$", colnames(data_NIRS_test))])
+  wn <- as.numeric(colnames(X_mat_train))  # 817, ..., 2764
+  
+  Y_train <- data_NIRS_train[[pheno_var]]
+  Y_test <- data_NIRS_test[[pheno_var]]
+
+  nbasis <- nbasis
+  basis <- create.bspline.basis(rangeval = range(wn), nbasis = nbasis)
+  fdPar_obj <- fdPar(basis, Lfdobj = 2, lambda = 1e-4)
+
+  fdobj <- smooth.basis(wn, t(X_mat_train), fdPar_obj)$fd
+
+  # Régression scalar-on-function
+  fReg <- fRegress(Y_train ~ nirs_fdobj, data = list(Y_train = Y_train, nirs_fdobj = fdobj))
+
+  
+  fdobj_test = smooth.basis(wn, t(X_mat_test), fdPar_obj)$fd
+  
+
+  # Coefficient fonctionnel
+  beta_fd <- fReg$betaestlist$nirs_fdobj$fd
+
+  # Intercept
+  beta0 <-  as.numeric(eval.fd(0,  fReg$betaestlist$const$fd))
+
+
+  yhat_pred <- beta0 + inprod(fdobj_test, beta_fd)[,1]
+
+
+  
+
+
+  obs_train <- Y_train
+  pred_train = fReg$yhatfdobj
+  rmse_train <- sqrt(mean((obs_train - pred_train)^2))
+  r2_train <- 1 - sum((obs_train - pred_train)^2) / sum((obs_train - mean(obs_train))^2)
+  df_plot_train <- data.frame(obs = obs_train, pred = pred_train)
+  plot_fit_obs_train = ggplot(df_plot_train, aes(x = obs_train, y = pred_train)) +
+    geom_point(alpha = 0.7) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+    labs(
+      x = paste0(pheno_var, " observée"),
+      y = paste0(pheno_var, " prédite"),
+      title = paste0(
+        "Freg – Obs vs Pred\n",
+        "RMSE = ", round(rmse_train, 3),
+        ", R² = ", round(r2_train, 3)
+      )
+    ) +
+    theme_minimal()
+  
+  
+
+  obs_test <- Y_test
+  pred_test = yhat_pred
+  rmse_test <- sqrt(mean((obs_test - pred_test)^2))
+  r2_test <- 1 - sum((obs_test - pred_test)^2) / sum((obs_test - mean(obs_test))^2)
+  df_plot_test <- data.frame(obs = obs_test, pred = pred_test)
+  plot_fit_obs_test = ggplot(df_plot_test, aes(x = obs_test, y = pred_test)) +
+    geom_point(alpha = 0.7) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+    labs(
+      x = paste0(pheno_var, " observée"),
+      y = paste0(pheno_var, " prédite"),
+      title = paste0(
+        "Freg – Obs vs Pred\n",
+        "RMSE = ", round(rmse_test, 3),
+        ", R² = ", round(r2_test, 3)
+      )
+    ) +
+    theme_minimal()
+  
+  
+    return(list(res_model = fReg,
+                rmse_train = rmse_train,
+                r2_train = r2_train,
+                plot_fit_obs_train = plot_fit_obs_train,
+                rmse_test = rmse_test, 
+                r2_test = r2_test,
+                plot_fit_obs_test = plot_fit_obs_test,
+                yhat_train = pred_train,
+                yhat_test = pred_test))
+
+  
+
+
+}
+
+
+
+
+
+```
+
+```{r random forest}
+
+
+fit_rf_train_test = function(data_NIRS_train, data_NIRS_test, pheno_var,  ntree = 500,
+  mtry = NULL
+){
+  
+  X_mat_train <- as.matrix(
+    data_NIRS_train[, grep("^[0-9]+$", colnames(data_NIRS_train))]
+  )
+  X_mat_test <- as.matrix(
+    data_NIRS_test[, grep("^[0-9]+$", colnames(data_NIRS_test))]
+  )
+  
+  Y_train <- data_NIRS_train[[pheno_var]]
+  Y_test  <- data_NIRS_test[[pheno_var]]
+  
+  df_train <- data.frame(
+    X_mat_train %>% as.data.frame() %>% rename_with(~ paste0("wn_", .x)),
+    pheno_var = Y_train
+  )
+  
+  df_test <- data.frame(
+    X_mat_test %>% as.data.frame() %>% rename_with(~ paste0("wn_", .x)),
+    pheno_var = Y_test
+  )
+  
+  p <- ncol(X_mat_train)
+  
+  # reglage de base de la rf
+  if (is.null(mtry)) {
+    mtry <- floor(sqrt(p))
+  }
+  
+  
+  rf_mod <- randomForest(
+    pheno_var ~ .,
+    data = df_train,
+    ntree = ntree,
+    mtry = mtry,
+    importance = TRUE
+  )
+  
+  pred_train <- rf_mod$predicted
+  pred_test  <- predict(rf_mod, newdata = df_test)
+  
+  rmse_train <- sqrt(mean((Y_train - pred_train)^2))
+  r2_train   <- 1 - sum((Y_train - pred_train)^2) /
+    sum((Y_train - mean(Y_train))^2)
+  
+  rmse_test <- sqrt(mean((Y_test - pred_test)^2))
+  r2_test   <- 1 - sum((Y_test - pred_test)^2) /
+    sum((Y_test - mean(Y_test))^2)
+  
+  df_plot_train <- data.frame(obs = Y_train, pred = pred_train)
+  plot_fit_obs_train <- ggplot(df_plot_train, aes(x = obs, y = pred)) +
+    geom_point(alpha = 0.7) +
+    geom_abline(slope = 1, intercept = 0,
+                linetype = "dashed", color = "red") +
+    labs(
+      x = paste0(pheno_var, " observée"),
+      y = paste0(pheno_var, " prédite"),
+      title = paste0(
+        "RF – Train Obs vs Pred\n",
+        "RMSE = ", round(rmse_train, 3),
+        ", R² = ", round(r2_train, 3)
+      )
+    ) +
+    theme_minimal()
+  
+  df_plot_test <- data.frame(obs = Y_test, pred = pred_test)
+  plot_fit_obs_test <- ggplot(df_plot_test, aes(x = obs, y = pred)) +
+    geom_point(alpha = 0.7) +
+    geom_abline(slope = 1, intercept = 0,
+                linetype = "dashed", color = "red") +
+    labs(
+      x = paste0(pheno_var, " observée"),
+      y = paste0(pheno_var, " prédite"),
+      title = paste0(
+        "RF – Test Obs vs Pred\n",
+        "RMSE = ", round(rmse_test, 3),
+        ", R² = ", round(r2_test, 3)
+      )
+    ) +
+    theme_minimal()
+  
+  return(list(
+    res_model = rf_mod,
+    rmse_train = rmse_train,
+    r2_train = r2_train,
+    plot_fit_obs_train = plot_fit_obs_train,
+    rmse_test = rmse_test,
+    r2_test = r2_test,
+    plot_fit_obs_test = plot_fit_obs_test,
+    yhat_train = pred_train,
+    yhat_test = pred_test
+  ))
+}
+
+
+mod.rf_TSW <- fit_rf_train_test(full_data_train, full_data_test, pheno_var = "MGT")
+
+mod.rf_TSW$plot_fit_obs_test
+```
+
+
+```{r fpls}
+
+
+fit_fpls_cv_train_test <- function(data_NIRS_train, data_NIRS_test, pheno_var, max_ncomp = 20, nbasis = 50) {
+  
+  
+  X_mat_train <- as.matrix(data_NIRS_train[, grep("^[0-9]+$", colnames(data_NIRS_train))])
+  X_mat_test  <- as.matrix(data_NIRS_test[, grep("^[0-9]+$", colnames(data_NIRS_test))])
+  wn <- as.numeric(colnames(X_mat_train))
+  
+  Y_train <- data_NIRS_train[[pheno_var]]
+  Y_test  <- data_NIRS_test[[pheno_var]]
+  
+  basis <- create.bspline.basis(rangeval = range(wn), nbasis = nbasis)
+  fdPar_obj <- fdPar(basis, Lfdobj = 2, lambda = 1e-4)
+  
+  
+  fdobj_train <- smooth.basis(wn, t(X_mat_train), fdPar_obj)$fd
+  fdobj_test  <- smooth.basis(wn, t(X_mat_test), fdPar_obj)$fd
+
+  fdata_train <- fdata(fdobj_train)
+  fdata_test  <- fdata(fdobj_test)
+
+  fpls_cv <- fregre.pls.cv(
+    fdata_train, Y_train,
+    kmax = 10,
+    criteria = "SIC"
+  )
+  
+  k_opt = which.min(fpls_cv$MSC)
+  
+  
+  fpls_final <- fregre.pls(
+  fdata_train,
+  Y_train,
+  l = 1:k_opt
+)
+  pred_train <- fpls_final$fitted.values
+  
+  
+  # predict marche pas on va y aller à la main grâce au code source de fregre.pls
+  
+  pc_test <- fdata2pls(
+    fdata_test,
+    y = Y_test,
+    ncomp = max(fpls_final$l),
+    lambda = fpls_final$lambda,
+    P = fpls_final$P
+  )
+  
+  T_test <- pc_test$coefs[, fpls_final$l, drop = FALSE]
+  coefs_lm <- coef(fpls_final$lm)
+  
+  beta0 <- coefs_lm[1]
+  ck    <- coefs_lm[-1]
+  
+  pred_test <- as.vector(beta0 + T_test %*% ck)
+  
+  # Si pas convaincu, run
+  #   pc_train <- fdata2pls(
+  #     fdata_train,
+  #     Y_train,
+  #     ncomp = max(fpls_final$l),
+  #     lambda = fpls_final$lambda,
+  #     P = fpls_final$P
+  # )
+  # 
+  # T_train <- pc_train$coefs[, fpls_final$l, drop = FALSE]
+  # ck    <- coefs_lm[-1]
+  # yhat_test <- as.vector(beta0 + T_test %*% ck)
+  # yhat_train_manual <- as.vector(beta0 + T_train %*% ck)
+  # max(abs(yhat_train_manual - fpls_final$fitted.values))
+  
+  
+  # best_ncomp <- cv_results$ncomp.opt
+  # message("Nombre optimal de composantes PLS retenu : ", best_ncomp)
+  
+  # fpls_res <- fpls(fdata_train, Y_train, ncomp = best_ncomp)
+
+  # pred_train <- predict(fpls_res, newdata = fdata_train)
+  # pred_test  <- predict(fpls_res, newdata = fdata(fdobj_test))
+  
+  rmse_train <- sqrt(mean((Y_train - pred_train)^2))
+  r2_train   <- 1 - sum((Y_train - pred_train)^2) / sum((Y_train - mean(Y_train))^2)
+  
+  rmse_test  <- sqrt(mean((Y_test - pred_test)^2))
+  r2_test    <- 1 - sum((Y_test - pred_test)^2) / sum((Y_test - mean(Y_test))^2)
+  
+  plot_train <- ggplot(data.frame(obs = Y_train, pred = pred_train),
+                       aes(x = obs, y = pred)) +
+    geom_point(alpha = 0.7) +
+    geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +
+    labs(
+      x = paste0(pheno_var, " observée"),
+      y = paste0(pheno_var, " prédite"),
+      title = paste0("PLS fonctionnel CV – Obs vs Pred\n",
+                     "RMSE = ", round(rmse_train, 3),
+                     ", R² = ", round(r2_train, 3))
+    ) +
+    theme_minimal()
+  
+  plot_test <- ggplot(data.frame(obs = Y_test, pred = pred_test),
+                      aes(x = obs, y = pred)) +
+    geom_point(alpha = 0.7) +
+    geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +
+    labs(
+      x = paste0(pheno_var, " observée"),
+      y = paste0(pheno_var, " prédite"),
+      title = paste0("PLS fonctionnel CV – Obs vs Pred\n",
+                     "RMSE = ", round(rmse_test, 3),
+                     ", R² = ", round(r2_test, 3))
+    ) +
+    theme_minimal()
+  
+  return(list(
+    res_model = fpls_final,
+    best_ncomp = max(fpls_final$l),
+    rmse_train = rmse_train, 
+    r2_train = r2_train,
+    plot_train = plot_train,
+    rmse_test = rmse_test,
+    r2_test = r2_test, 
+    plot_test = plot_test,
+    yhat_train = pred_train,
+    yhat_test = pred_test
+  ))
+}
+
+
+
+# mod.fpls_TSW <- fit_fpls_cv_train_test(full_data_train, full_data_test, pheno_var = "MGT", nbasis = 100)
+# 
+# mod.fpls_TSW$plot_test
+# mod.rf
+```
+
+
+```{r pls}
+
+fit_pls_train_test <- function(data_NIRS_train, data_NIRS_test, pheno_var){
+  
+  X_mat_train <- as.matrix(
+    data_NIRS_train[, grep("^[0-9]+$", colnames(data_NIRS_train))]
+  )
+  X_mat_test <- as.matrix(
+    data_NIRS_test[, grep("^[0-9]+$", colnames(data_NIRS_test))]
+  )
+  
+  Y_train <- data_NIRS_train[[pheno_var]]
+  Y_test  <- data_NIRS_test[[pheno_var]]
+  
+  df_train <- data.frame(
+    X_mat_train %>% as.data.frame() %>% rename_with(~ paste0("wn_", .x)),
+    pheno_var = Y_train
+  )
+  
+  df_test <- data.frame(
+    X_mat_test %>% as.data.frame() %>% rename_with(~ paste0("wn_", .x)),
+    pheno_var = Y_test
+  )
+  
+  
+  pls_mod <- plsr(
+    pheno_var ~ .,
+    data = df_train,
+    scale = TRUE,
+    validation = "CV"  # leave-one-out par défaut
+  )
+  
+  rmsep_vals <- RMSEP(pls_mod)
+  ncomp_opt <- which.min(rmsep_vals$val[1, , ])
+  
+  pred_train <- as.vector(predict(pls_mod, ncomp = ncomp_opt, newdata = df_train))
+  pred_test  <- as.vector(predict(pls_mod, ncomp = ncomp_opt, newdata = df_test))
+  
+  rmse_train <- sqrt(mean((Y_train - pred_train)^2))
+  r2_train   <- 1 - sum((Y_train - pred_train)^2) / sum((Y_train - mean(Y_train))^2)
+  
+  rmse_test <- sqrt(mean((Y_test - pred_test)^2))
+  r2_test   <- 1 - sum((Y_test - pred_test)^2) / sum((Y_test - mean(Y_test))^2)
+  
+  # --- 6. Graphiques ---
+  df_plot_train <- data.frame(obs = Y_train, pred = pred_train)
+  plot_fit_obs_train <- ggplot(df_plot_train, aes(x = obs, y = pred)) +
+    geom_point(alpha = 0.7) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+    labs(
+      x = paste0(pheno_var, " observée"),
+      y = paste0(pheno_var, " prédite"),
+      title = paste0(
+        "PLS – Train Obs vs Pred (", ncomp_opt, " comps)\n",
+        "RMSE = ", round(rmse_train, 3),
+        ", R² = ", round(r2_train, 3)
+      )
+    ) +
+    theme_minimal()
+  
+  df_plot_test <- data.frame(obs = Y_test, pred = pred_test)
+  plot_fit_obs_test <- ggplot(df_plot_test, aes(x = obs, y = pred)) +
+    geom_point(alpha = 0.7) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+    labs(
+      x = paste0(pheno_var, " observée"),
+      y = paste0(pheno_var, " prédite"),
+      title = paste0(
+        "PLS – Test Obs vs Pred (", ncomp_opt, " comps)\n",
+        "RMSE = ", round(rmse_test, 3),
+        ", R² = ", round(r2_test, 3)
+      )
+    ) +
+    theme_minimal()
+  
+  return(list(
+    res_model = pls_mod,
+    ncomp_opt = ncomp_opt,
+    rmse_train = rmse_train,
+    r2_train = r2_train,
+    plot_fit_obs_train = plot_fit_obs_train,
+    rmse_test = rmse_test,
+    r2_test = r2_test,
+    plot_fit_obs_test = plot_fit_obs_test,
+    yhat_train = pred_train,
+    yhat_test = pred_test
+  ))
+}
+
+# mod.pls_TSW <- fit_pls_train_test(full_data_train, full_data_test, pheno_var = "MGT")
+# 
+# mod.pls_TSW$rmse_test
+```
+
+
+```{r fit all models}
+
+
+
+phenos <- c("AUC", "TSW", "MGT", "T50", "UNI", "GR", "GR36", "GR42", "FG", "IS", "VI", "ES")
+
+models <- c("fpls_cv", "freg", "pls", "rf")
+
+results_list <- list()
+
+# Boucle sur les phénotypes ----
+for(pheno in phenos){
+  
+  message("Fitting phenotype: ", pheno)
+  y_train = full_data_train[[pheno]]
+  y_test = full_data_test[[pheno]]
+  
+  try({
+    res_fpls <- fit_fpls_cv_train_test(full_data_train, full_data_test, pheno)
+    res_fpls$y_train = y_train # J'ai oublié de save les y_train et y_test dans les résultats, donc je les remets ici
+    res_fpls$y_test = y_test
+    results_list[[paste0(pheno, "_fpls_cv")]] <- res_fpls
+  }, silent = TRUE)
+  
+  try({
+    res_freg <- fit_freg_train_test(full_data_train, full_data_test, pheno)
+    res_freg$y_train = y_train
+    res_freg$y_test = y_test
+    results_list[[paste0(pheno, "_freg")]] <- res_freg
+  }, silent = TRUE)
+  
+  try({
+    res_pls <- fit_pls_train_test(full_data_train, full_data_test, pheno)
+    res_pls$y_train = y_train
+    res_pls$y_test = y_test
+    results_list[[paste0(pheno, "_pls")]] <- res_pls
+  }, silent = TRUE)
+  
+  try({
+    res_rf <- fit_rf_train_test(full_data_train, full_data_test, pheno)
+    res_rf$y_train = y_train
+    res_rf$y_test = y_test
+    results_list[[paste0(pheno, "_rf")]] <- res_rf
+  }, silent = TRUE)
+  
+}
+
+# Extraire RMSE et R2
+rmse_df <- map_dfr(names(results_list), function(name){
+  res <- results_list[[name]]
+  
+  parts <- strsplit(name, "_")[[1]]
+  pheno_name <- parts[1]
+  model_name <- paste(parts[-1], collapse = "_")
+  
+  tibble(
+    pheno = pheno_name,
+    model = model_name,
+    rmse_train = res$rmse_train,
+    r2_train   = res$r2_train,
+    rmse_test  = res$rmse_test,
+    r2_test    = res$r2_test
+  )
+})
+
+rmse_plot_df <- rmse_df %>%
+  pivot_longer(
+    cols = c(rmse_train, rmse_test),
+    names_to = "dataset",
+    values_to = "rmse"
+  )
+
+ggplot(rmse_plot_df, aes(x = model, y = rmse, fill = dataset)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~ pheno, scales = "free_y") +
+  theme_minimal() +
+  labs(
+    x = "Modèle",
+    y = "RMSE",
+    fill = "Dataset",
+    title = "Comparaison RMSE par modèle et phénotype"
+  )
+
+
+
+```
+
+
+```{r}
+
+# Extraire obs_pred
+obs_pred_df <- map_dfr(names(results_list), function(name){
+  res <- results_list[[name]]
+  
+  parts <- strsplit(name, "_")[[1]]
+  pheno_name <- parts[1]
+  model_name <- paste(parts[-1], collapse = "_")
+  
+  if(!("yhat_train" %in% names(res))) stop(paste("yhat_train manquant dans", name))
+  if(!("yhat_test" %in% names(res))) stop(paste("yhat_test manquant dans", name))
+  
+  bind_rows(
+    tibble(pheno = pheno_name, model = model_name, dataset = "train",
+           obs = res$y_train, 
+           pred = res$yhat_train),
+    tibble(pheno = pheno_name, model = model_name, dataset = "test",
+           obs = res$y_test,
+           pred = res$yhat_test)
+  )
+})
+
+ggplot(obs_pred_df, aes(x = obs, y = pred, color = dataset)) +
+  geom_point(alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  ggh4x::facet_grid2(pheno ~ model, independent = "x", scales = "free") +
+  theme_minimal() +
+  labs(
+    x = "Observé",
+    y = "Prédit",
+    color = "Dataset",
+    title = "Obs vs Pred – tous modèles et phénotypes"
+  )
+```
+
+
+
+# Poubelle
+
+```{r}
+full_data = NIRS_graines %>% 
+  left_join(pheno_VG)
+
+
+
+data_rf = cbind( full_data %>% select(-all_of(colnames(pheno_VG_pred ))) %>% rename_with( ~  paste0("wn_",.x)), AUC = full_data$AUC)
+
+mod.rf = randomForest(AUC ~ ., data = as.matrix(data_rf)  )
+
+
+
+tibble(fitted = mod.rf$predicted, observed = data_rf$AUC) %>% 
+  ggplot(aes(x = observed, y =  fitted)) +
+  geom_point() + 
+  geom_abline()
+
+
+```
+
+
+```{r pfr, eval = FALSE}
+
+library(refund)
+
+full_data = NIRS_graines %>% 
+  left_join(pheno_VG)
+
+Y_response  = full_data[["AUC"]]
+
+# Matrice individus × longueurs d’onde
+X_mat <- as.matrix(full_data[, grep("^[0-9]+$", colnames(full_data))])
+
+wn <- as.numeric(colnames(X_mat))
+Y_response  = full_data[["AUC"]]
+
+pfr_res <- pfr(
+  Y_response ~ lf(X_mat, argvals = wn, nbasis = 40, pen.order = 2)
+)
+# Matrice individus × longueurs d’onde
+X_mat <- as.matrix(full_data[, grep("^[0-9]+$", colnames(full_data))])
+
+wn <- as.numeric(colnames(X_mat))
+Y <- full_data$AUC
+
+
+df_pfr <- list(
+  Y = Y,
+  X_mat = X_mat
+)
+
+pfr_res <- pfr(
+  Y ~ lf(X_mat, argvals = wn, nbasis = 40, pen.order = 2),
+  data = df_pfr
+)
+
+X_list <- lapply(seq_len(nrow(X_mat)), function(i) X_mat[i, ])
+
+df_pfr <- data.frame(Y = Y)
+df_pfr$X_list <- X_list
+
+pfr_res <- pfr(
+  Y ~ lf(X_list, argvals = wn, nbasis = 40, pen.order = 2),
+  data = df_pfr
+)
+
+tibble(fitted = pfr_res$fitted.values, observed = Y_response) %>% 
+  ggplot(aes(x = observed, y =  fitted)) +
+  geom_point() + 
+  geom_abline()
+
+tibble(fitted = pfr_res$fitted.values, observed = Y_response, resid = pfr_res$residuals) %>% 
+  ggplot(aes(x = observed, y =  resid)) +
+  geom_point() + 
+  geom_abline(slope = 0)
+
+
+tibble(fitted = pfr_res$fitted.values, observed = Y_response) %>% 
+  summarise(rmse = sqrt(mean((fitted - observed)^2))) 
+
+```
+
+
+```{r new pfr, eval = FALSE}
+library(refund)
+
+
+# Pour la stabilité, réduire le nombre de bases (nbasis << ncol(X_mat))
+nbasis <- 50  # ajustable
+pen.order <- 2 # pénalisation sur la dérivée seconde
+
+# Ajustement PFR scalar-on-function
+# IMPORTANT : X_mat doit être dans l'environnement global
+set.seed(123)
+pfr_res <- pfr(
+  Y ~ lf(X_mat, argvals = wn, nbasis = nbasis, pen.order = pen.order)
+)
+
+# Résumé et diagnostics
+summary(pfr_res)
+
+
+
+# FPCA pour réduire la dimension
+fpca_res <- fpca.sc(Y = X_mat, argvals = wn, pve = 0.99)  
+# pve = 0.99 -> garder assez de variance (~10-20 composantes)
+
+scores <- fpca_res$scores  # matrice individus × ncomp
+
+# Passer ces scores à pfr
+# Maintenant nbasis est sur le terme fonctionnel de scores (très petit)
+pfr_res <- pfr(
+  Y ~ lf(scores, argvals = 1:ncol(scores), nbasis = ncol(scores), pen.order = 2)
+)
+
+
+
+```
+
+
+
+
+```{r new pfr bis, eval = FALSE}
+
+library(fda)
+
+full_data = NIRS_graines %>% 
+  left_join(pheno_VG)
+
+
+# Extraire la matrice NIRS (lignes = individus, colonnes = longueurs d'onde)
+X_mat <- as.matrix(full_data[, grep("^[0-9]+$", colnames(full_data))])
+wn <- as.numeric(colnames(X_mat))  # 817, ..., 2764
+  
+Y <- full_data$AUC
+
+nbasis <- 50
+basis <- create.bspline.basis(rangeval = range(wn), nbasis = nbasis)
+fdPar_obj <- fdPar(basis, Lfdobj = 2, lambda = 1e-4)
+
+fdobj <- smooth.basis(wn, t(X_mat), fdPar_obj)$fd
+
+# Régression scalar-on-function
+fReg <- fRegress(Y ~ fdobj)
+
+fReg$yhatfdobj
+
+tibble(fitted = fReg$yhatfdobj, observed = fReg$yvec) %>% 
+  ggplot(aes(x = observed, y =  fitted)) +
+  geom_point()+
+  geom_abline()
+
+
+full_data_train = NIRS_graines %>% 
+  left_join(pheno_VG) %>% 
+  slice_sample(prop = .8)
+
+full_data_test = full_data %>% anti_join(full_data_train)
+
+
+# Extraire la matrice NIRS (lignes = individus, colonnes = longueurs d'onde)
+X_mat_train <- as.matrix(full_data_train[, grep("^[0-9]+$", colnames(full_data_train))])
+X_mat_test <- as.matrix(full_data_test[, grep("^[0-9]+$", colnames(full_data_test))])
+wn <- as.numeric(colnames(X_mat_train))  # 817, ..., 2764
+  
+Y_train <- full_data_train$AUC
+
+nbasis <- 50
+basis <- create.bspline.basis(rangeval = range(wn), nbasis = nbasis)
+fdPar_obj <- fdPar(basis, Lfdobj = 2, lambda = 1e-4)
+
+fdobj <- smooth.basis(wn, t(X_mat_train), fdPar_obj)$fd
+
+# Régression scalar-on-function
+fReg <- fRegress(Y_train ~ fdobj)
+
+tibble(fitted = fReg$yhatfdobj, observed = fReg$yvec) %>% 
+  ggplot(aes(x = observed, y =  fitted)) +
+  geom_point()+
+  geom_abline()
+
+
+
+
+fdobj_test = smooth.basis(wn, t(X_mat_test), fdPar_obj)$fd
+
+Y_test = full_data_test$AUC
+
+
+# Coefficient fonctionnel
+beta_fd <- fReg$betaestlist$fdobj$fd
+
+# Intercept
+beta0 <- eval.fd(0,  fReg$betaestlist$const$fd)
+
+
+yhat_pred <- beta0 + inprod(fdobj_test, beta_fd)[,1]
+
+
+```
+
+
+```{r poubelle, eval = FALSE}
+
+
+
+
+fit_pls = function(data_NIRS_train, data_NIRS_test, pheno_var){
+  
+  data_pls = cbind( data_NIRS %>% select(-all_of(colnames(pheno_VG_pred ))) %>% rename_with( ~  paste0("wn_",.x)), pheno_var = data_NIRS[[pheno_var]])
+  
+  set.seed(123)
+  
+  pls_mod <- plsr(
+    pheno_var ~ .,
+    data = data_pls,
+    scale = TRUE,
+    validation = "CV"  # leave-one-out par défaut
+  )
+  
+  rmsep_vals <- RMSEP(pls_mod)
+  
+  
+  ncomp_opt <- which.min(rmsep_vals$val[1, , ])
+  
+  
+  # plot(rmsep_vals, legendpos = "topright")
+  
+  pred <- as.vector(
+    predict(pls_mod, ncomp = ncomp_opt, newdata = data_pls)
+  )
+  obs <- data_pls[["pheno_var"]]
+  
+  rmse <- sqrt(mean((obs - pred)^2))
+  r2 <- 1 - sum((obs - pred)^2) / sum((obs - mean(obs))^2)
+  
+  df_plot <- data.frame(obs = obs, pred = pred)
+  
+  plot_fit_obs = ggplot(df_plot, aes(x = obs, y = pred)) +
+    geom_point(alpha = 0.7) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+    labs(
+      x = paste0(pheno_var, " observée"),
+      y = paste0(pheno_var, " prédite"),
+      title = paste0(
+        "PLS – Obs vs Pred (", ncomp_opt, " composantes)\n",
+        "RMSE = ", round(rmse, 3),
+        ", R² = ", round(r2, 3)
+      )
+    ) +
+    theme_minimal()
+  
+  return(list(rmse = rmse, r2 = r2, mod.pls = pls_mod, plot_fit_obs = plot_fit_obs))
+}
+
+
+fit_freg = function(data_NIRS_train, data_NIRS_test, pheno_var){
+  
+  X_mat <- as.matrix(data_NIRS[, grep("^[0-9]+$", colnames(data_NIRS))])
+
+  wn <- as.numeric(colnames(X_mat))
+  Y <- full_data[[pheno_var]]
+
+  
+  
+  nbasis <- 50
+  basis <- create.bspline.basis(rangeval = range(wn), nbasis = nbasis)
+  fdPar_obj <- fdPar(basis, Lfdobj = 2, lambda = 1e-4)
+
+  fdobj <- smooth.basis(wn, t(X_mat), fdPar_obj)$fd
+
+# Régression scalar-on-function
+  fReg <- fRegress(Y ~ fdobj)
+
+
+  obs <- Y
+  pred = fReg$yhatfdobj
+  
+  rmse <- sqrt(mean((obs - pred)^2))
+  r2 <- 1 - sum((obs - pred)^2) / sum((obs - mean(obs))^2)
+  
+  df_plot <- data.frame(obs = obs, pred = pred)
+  
+  plot_fit_obs = ggplot(df_plot, aes(x = obs, y = pred)) +
+    geom_point(alpha = 0.7) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+    labs(
+      x = paste0(pheno_var, " observée"),
+      y = paste0(pheno_var, " prédite"),
+      title = paste0(
+        "Freg – Obs vs Pred\n",
+        "RMSE = ", round(rmse, 3),
+        ", R² = ", round(r2, 3)
+      )
+    ) +
+    theme_minimal()
+  
+    return(list(rmse = rmse, r2 = r2, fReg = fReg, plot_fit_obs = plot_fit_obs))
+
+  
+
+
+}
+```
+
+
+```{r FPCA, eval = FALSE}
+
+
+
+library(fda)
+
+wn <- sort(as.numeric(colnames(graines_MEAN[,-1])))
+
+# spec_mat <- data_NIRS %>%
+#   select(Sample_ID, Wavenumber, Absorbance) %>%
+#   pivot_wider(
+#     names_from = Sample_ID,
+#     values_from = Absorbance
+#   ) %>%
+#   arrange(Wavenumber)
+
+
+
+Y <- t(as.matrix(NIRS_graines[,-1])  )
+# wave_number <- spec_mat$Wavenumber
+
+
+nbasis <- 40
+basis <- create.bspline.basis(
+  rangeval = range(wn),
+  nbasis = nbasis
+)
+
+fdPar_obj <- fdPar(basis, Lfdobj = 2, lambda = 1e-6)
+
+fdobj <- smooth.basis(wn, Y, fdPar_obj)$fd
+
+pca_res <- pca.fd(fdobj, nharm = 3, centerfns = TRUE)
+
+
+
+
+
+
+mat_coord = tibble(dim1 = pca_res$scores[,1],
+                   dim2 = pca_res$scores[,2],
+                   Sample_ID = names(graines[,1]) )
+
+
+mat_coord %>% 
+  ggplot(aes(x = dim1, dim2)) +
+  geom_point()
+
+harmonic_values = eval.fd(evalarg = wn , fdobj = pca_res$harmonics)
+
+mat_harmonics = tibble(wave_number = wn,
+                       mean_fun = eval.fd(evalarg = wn , fdobj = pca_res$meanfd)[,1],
+                       PC1 = harmonic_values[,1],
+                       PC2 = harmonic_values[,2],
+                       PC3 = harmonic_values[,3])
+
+mat_harmonics %>% 
+  pivot_longer(-wave_number, values_to = "harmonic_value", names_to = "PC") %>%  
+  ggplot(aes(x = wave_number, y = harmonic_value)) +
+  geom_line(aes(group  = PC, color = PC)) + 
+  theme(legend.position = "bottom")
+
+
+```
