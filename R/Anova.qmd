@@ -1,0 +1,146 @@
+---
+title: "Untitled"
+format: html
+---
+
+```{r}
+library(dplyr)
+library(openxlsx)
+library(car)
+```
+
+#Création dt_anova
+```{r}
+
+data <-  read.xlsx(xlsxFile = "data/climate_data/SuppData.xlsx", fillMergedCells = TRUE, colNames = TRUE)
+
+data <- data %>%
+  rename(ENVIRONNEMENT = `Environment.name(c)`) %>%
+  mutate(ENVIRONNEMENT = toupper(sub("_.*", "", ENVIRONNEMENT))) %>%
+  filter(grepl("N\\+", `Nitrogen(d)`))
+
+partenaire <- read.csv("data/landmarks.csv")
+
+dt_anova <- data %>% left_join(partenaire %>% dplyr::select(ENVIRONNEMENT, PARTENAIRE),by = "ENVIRONNEMENT")
+
+summary(dt_anova)
+
+dt_anova <- dt_anova %>% 
+  rename(Year = `Year(a)`) %>%
+  rename(Loc = `Location(b)`) %>% 
+  rename(SY = `Seed.yield(g)`)
+
+#write.csv(dt_anova, file = "R/dt_anova")
+  
+View(dt_anova)  
+
+```
+
+Données déséquilibrées --> Plan Type III
+
+Year
+Location
+Latitude
+Longitude
+
+Water capacity
+WSC_MAX	Maximal water soil content for a given environment (mm)
+
+Nitrogen
+AN	Nitrogen amount in the plant aerial parts at bolting  (g  per m²)
+ADB	Plant Aerial Dry Biomass at bolting (t.m²)
+NNI	Nitrogen Nutrition Index
+Ntotal	mineral nitrogen Input (kg.ha-1)
+WSC_I	Water soil content at N-input (% of WSC_MAX) (redondante avec WSC max)
+DBI	Number of days without rainfall durig the decade preceeding fertilization
+DAI	Number of days without rainfall during the decade post fertilization
+RO	number of days with Run Off during the decade after N-input (peu variable)
+RF	cumulated Rainfall during the decade after N-input (mm)
+
+- POurquoi on fait pas de la PLS plutôt ? 
+
+
+#Fichier Dt_anova
+```{r}
+dt_anova <- read.csv("Data/dt_anova", row.names = 1)
+
+dt_anova$Year <- factor(dt_anova$Year)
+dt_anova$Loc <- factor(dt_anova$Loc)
+
+summary(dt_anova)
+```
+
+# Régression linéaire
+
+```{r}
+#Sur les variables qualitatives
+contrasts(dt_anova$Year) <- contr.sum(n=nlevels(dt_anova$Year)) 
+contrasts(dt_anova$Loc) <- contr.sum(n=nlevels(dt_anova$Loc))
+
+Anova(lm(SY ~ Year+Loc+Latitude+Longitude+WSC_MAX+AN+ADB+NNI+Ntotal+WSC_I+DBI+DAI+RO+RF,dt_anova),type="III") 
+#trop de paramètres à estimer
+#pas assez d’observations
+# Year et Loc trop de facteurs, Pour Year (19)
+
+Anova(lm(SY ~ Latitude+Longitude+WSC_MAX+AN+NNI+Ntotal+DBI+RF,dt_anova),type="III") 
+Anova(lm(SY ~ Latitude+Longitude+WSC_MAX+NNI+Ntotal+DBI+RF,dt_anova),type="III")
+Anova(lm(SY ~ Latitude+Longitude+WSC_MAX+NNI+DBI+RF,dt_anova),type="III")
+Anova(lm(SY ~ Longitude+WSC_MAX+NNI+DBI+RF,dt_anova),type="III")
+Anova(lm(SY ~ Longitude+WSC_MAX+NNI+DBI,dt_anova),type="III")
+Anova(lm(SY ~ Longitude+NNI+DBI,dt_anova),type="III")
+Anova(lm(SY ~ Longitude+DBI,dt_anova),type="III")
+#aucun effet significatif 
+
+modele_step <- step(lm(SY ~ Latitude+Longitude+WSC_MAX+AN+NNI+Ntotal+DBI+RF,dt_anova),type="III", direction = "both")
+summary(modele_step)
+#Mon modèle final après AIC minimal : SY ~ Longitude + WSC_MAX + DBI, Mais aucune variable n’est significative au seuil 0.05
+#R² = 0.21, donc seulement ~21% de la variance expliquée.
+#Longitude = EO
+
+```
+
+#PLS
+
+Le modèle PLS univarié repose sur la construction de variables latentes (T) comme combinaisons linéaires des variables X (les indicateurs pédoclimatiques dans cette étude) de façon à maximiser cov(T,Y), puis en régressant Y (le rendement moyen d’Aviso et de Montego) sur ces variables latentes
+
+Le nombre de variables latentes à considérer a été déterminé à partir de l’indicateur Q² [37] : une nouvelle composante était ajoutée si sa valeur de Q² était supérieure à 0,0975. Enfin, la performance du modèle a été estimée par sa valeur Q²cum calculée sur toutes les composantes.
+
+Sélection parmi les indicateurs étudiés pouvait améliorer le modèle PLS
+Méthode Backward-Q²cum (BQ) [38]. La première étape consiste à effectuer une régression PLS sur tous les indicateurs pédoclimatiques, puis à sélectionner l’ensemble des indicateurs qui expliquent la variabilité de SY via une sélection backward : à chaque étape, l’indicateur présentant le plus petit coefficient de régression en valeur absolue est retiré, et une nouvelle régression PLS est réalisée. Ce processus est répété n-1 fois (n = nombre d’indicateurs pédoclimatiques considérés).
+
+```{r}
+library(plsdepot)
+
+# Séparer Y et X
+Y <- dt_anova$SY
+X <- dt_anova[, setdiff(names(dt_anova), "SY")]
+X <- X[,-(1:10)]
+X <- X[,-80]
+X <- X[,-(2:10)]
+colnames(X)
+
+x <- subset(X, select = -c(WS_FLO,HT_FLO))
+View(X)
+colnames(X)
+
+
+```
+
+WD_P300
+WD_FLO
+WS_FLO
+WD_B
+WS_B
+WD_CW
+WS_CW
+LT_P1000
+FR_P1000
+LT_P600
+FR_P600
+FR_P300
+FR_FLO
+HT_FLO
+HT_B
+HT_CW
+
+
