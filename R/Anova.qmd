@@ -62,7 +62,7 @@ RF	cumulated Rainfall during the decade after N-input (mm)
 
 #Fichier Dt_anova
 ```{r}
-dt_anova <- read.csv("R/dt_anova", row.names = 1)
+dt_anova <- read.csv("Data/dt_anova", row.names = 1)
 
 dt_anova$Year <- factor(dt_anova$Year)
 dt_anova$Loc <- factor(dt_anova$Loc)
@@ -99,6 +99,48 @@ summary(modele_step)
 
 ```
 
+#PLS
 
+Le modèle PLS univarié repose sur la construction de variables latentes (T) comme combinaisons linéaires des variables X (les indicateurs pédoclimatiques dans cette étude) de façon à maximiser cov(T,Y), puis en régressant Y (le rendement moyen d’Aviso et de Montego) sur ces variables latentes
+
+Le nombre de variables latentes à considérer a été déterminé à partir de l’indicateur Q² [37] : une nouvelle composante était ajoutée si sa valeur de Q² était supérieure à 0,0975. Enfin, la performance du modèle a été estimée par sa valeur Q²cum calculée sur toutes les composantes.
+
+Sélection parmi les indicateurs étudiés pouvait améliorer le modèle PLS
+Méthode Backward-Q²cum (BQ) [38]. La première étape consiste à effectuer une régression PLS sur tous les indicateurs pédoclimatiques, puis à sélectionner l’ensemble des indicateurs qui expliquent la variabilité de SY via une sélection backward : à chaque étape, l’indicateur présentant le plus petit coefficient de régression en valeur absolue est retiré, et une nouvelle régression PLS est réalisée. Ce processus est répété n-1 fois (n = nombre d’indicateurs pédoclimatiques considérés).
+
+```{r}
+library(plsdepot)
+
+# Séparer Y et X
+Y <- dt_anova$SY
+X <- dt_anova[, setdiff(names(dt_anova), "SY")]
+X <- X[,-(1:10)]
+X <- X[,-80]
+X <- X[,-(2:10)]
+colnames(X)
+
+x <- subset(X, select = -c(WS_FLO,HT_FLO))
+View(X)
+colnames(X)
+
+
+```
+
+WD_P300
+WD_FLO
+WS_FLO
+WD_B
+WS_B
+WD_CW
+WS_CW
+LT_P1000
+FR_P1000
+LT_P600
+FR_P600
+FR_P300
+FR_FLO
+HT_FLO
+HT_B
+HT_CW
 
 
