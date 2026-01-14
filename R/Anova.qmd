@@ -1,0 +1,104 @@
+---
+title: "Untitled"
+format: html
+---
+
+```{r}
+library(dplyr)
+library(openxlsx)
+library(car)
+```
+
+#Création dt_anova
+```{r}
+
+data <-  read.xlsx(xlsxFile = "data/climate_data/SuppData.xlsx", fillMergedCells = TRUE, colNames = TRUE)
+
+data <- data %>%
+  rename(ENVIRONNEMENT = `Environment.name(c)`) %>%
+  mutate(ENVIRONNEMENT = toupper(sub("_.*", "", ENVIRONNEMENT))) %>%
+  filter(grepl("N\\+", `Nitrogen(d)`))
+
+partenaire <- read.csv("data/landmarks.csv")
+
+dt_anova <- data %>% left_join(partenaire %>% dplyr::select(ENVIRONNEMENT, PARTENAIRE),by = "ENVIRONNEMENT")
+
+summary(dt_anova)
+
+dt_anova <- dt_anova %>% 
+  rename(Year = `Year(a)`) %>%
+  rename(Loc = `Location(b)`) %>% 
+  rename(SY = `Seed.yield(g)`)
+
+#write.csv(dt_anova, file = "R/dt_anova")
+  
+View(dt_anova)  
+
+```
+
+Données déséquilibrées --> Plan Type III
+
+Year
+Location
+Latitude
+Longitude
+
+Water capacity
+WSC_MAX	Maximal water soil content for a given environment (mm)
+
+Nitrogen
+AN	Nitrogen amount in the plant aerial parts at bolting  (g  per m²)
+ADB	Plant Aerial Dry Biomass at bolting (t.m²)
+NNI	Nitrogen Nutrition Index
+Ntotal	mineral nitrogen Input (kg.ha-1)
+WSC_I	Water soil content at N-input (% of WSC_MAX) (redondante avec WSC max)
+DBI	Number of days without rainfall durig the decade preceeding fertilization
+DAI	Number of days without rainfall during the decade post fertilization
+RO	number of days with Run Off during the decade after N-input (peu variable)
+RF	cumulated Rainfall during the decade after N-input (mm)
+
+- POurquoi on fait pas de la PLS plutôt ? 
+
+
+#Fichier Dt_anova
+```{r}
+dt_anova <- read.csv("R/dt_anova", row.names = 1)
+
+dt_anova$Year <- factor(dt_anova$Year)
+dt_anova$Loc <- factor(dt_anova$Loc)
+
+summary(dt_anova)
+```
+
+# Régression linéaire
+
+```{r}
+#Sur les variables qualitatives
+contrasts(dt_anova$Year) <- contr.sum(n=nlevels(dt_anova$Year)) 
+contrasts(dt_anova$Loc) <- contr.sum(n=nlevels(dt_anova$Loc))
+
+Anova(lm(SY ~ Year+Loc+Latitude+Longitude+WSC_MAX+AN+ADB+NNI+Ntotal+WSC_I+DBI+DAI+RO+RF,dt_anova),type="III") 
+#trop de paramètres à estimer
+#pas assez d’observations
+# Year et Loc trop de facteurs, Pour Year (19)
+
+Anova(lm(SY ~ Latitude+Longitude+WSC_MAX+AN+NNI+Ntotal+DBI+RF,dt_anova),type="III") 
+Anova(lm(SY ~ Latitude+Longitude+WSC_MAX+NNI+Ntotal+DBI+RF,dt_anova),type="III")
+Anova(lm(SY ~ Latitude+Longitude+WSC_MAX+NNI+DBI+RF,dt_anova),type="III")
+Anova(lm(SY ~ Longitude+WSC_MAX+NNI+DBI+RF,dt_anova),type="III")
+Anova(lm(SY ~ Longitude+WSC_MAX+NNI+DBI,dt_anova),type="III")
+Anova(lm(SY ~ Longitude+NNI+DBI,dt_anova),type="III")
+Anova(lm(SY ~ Longitude+DBI,dt_anova),type="III")
+#aucun effet significatif 
+
+modele_step <- step(lm(SY ~ Latitude+Longitude+WSC_MAX+AN+NNI+Ntotal+DBI+RF,dt_anova),type="III", direction = "both")
+summary(modele_step)
+#Mon modèle final après AIC minimal : SY ~ Longitude + WSC_MAX + DBI, Mais aucune variable n’est significative au seuil 0.05
+#R² = 0.21, donc seulement ~21% de la variance expliquée.
+#Longitude = EO
+
+```
+
+
+
+
