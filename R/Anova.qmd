@@ -109,21 +109,20 @@ Sélection parmi les indicateurs étudiés pouvait améliorer le modèle PLS
 Méthode Backward-Q²cum (BQ) [38]. La première étape consiste à effectuer une régression PLS sur tous les indicateurs pédoclimatiques, puis à sélectionner l’ensemble des indicateurs qui expliquent la variabilité de SY via une sélection backward : à chaque étape, l’indicateur présentant le plus petit coefficient de régression en valeur absolue est retiré, et une nouvelle régression PLS est réalisée. Ce processus est répété n-1 fois (n = nombre d’indicateurs pédoclimatiques considérés).
 
 ```{r}
-library(plsdepot)
+library(plsdepot) #intègre le calcul de Q² cum en sortie, utilisé dans la thèse
 
 # Séparer Y et X
 Y <- dt_anova$SY
 X <- dt_anova[, setdiff(names(dt_anova), "SY")]
-X <- X[,-(1:10)]
-X <- X[,-80]
-X <- X[,-(2:10)]
-colnames(X)
-
-x <- subset(X, select = -c(WS_FLO,HT_FLO))
+X <- X[,-2]
+X <- X[,-(3:9)]
+X <- X[,-82]
+X <- subset(X, select = -c(WS_FLO,HT_FLO))
 View(X)
 colnames(X)
 
-
+summary(X)
+X$Year<- as.numeric(sub(".*-", "", X$Year))
 ```
 
 WD_P300
@@ -143,4 +142,148 @@ HT_FLO
 HT_B
 HT_CW
 
+Au final, on prend aussi les qualificatifs d'ITK 
+Année
+Latitude
+Longitude
+AN
+ADB
+
+#PLS univariée
+Pour obtenir les coefficients de refression et la perf prédictive Q² de chaque variable 
+```{r}
+# Fit PLS sur toutes les variables
+pls_full <- plsreg1(X, Y, comps = nrow(X)-1, crosval = TRUE)  # comps=nombre max de composantes latentes
+which(pls_full$Q2 > 0.0975)
+pls_full$Q2
+pls_full$reg.coefs
+names(pls_full)
+pls_full$reg.coefs[names(coefs) != "Intercept"]
+which.max(pls_full$Q2) #renvoie le nombre de composantes qui maximise Q2
+
+```
+
+#Backward-Q²cum
+Faire une boucle pour retirer à chaque étape l'indicateur avec le plus petit coefficient en valeur absolue.
+Refaire la PLS
+Conserver le modèle avec Q²cum maximal, on mémorise la combinaison de variables donnant le Q² cumulatif maximal
+But :Éliminer progressivement les variables les moins importantes, identifier le sous-ensemble optimal de variables qui maximise la capacité prédictive du modèle
+
+```{r}
+variables <- colnames(X)
+best_Q2cum <- 0
+best_vars <- variables
+
+while (length(variables) > 1) {
+  pls_temp <- plsreg1(X[, variables], Y, comps = nrow(X)-1, crosval = TRUE)
+  coefs <- pls_temp$reg.coefs
+  coefs <- coefs[names(coefs) != "Intercept"] 
+  min_var <- variables[which.min(abs(coefs))]
+  
+  # Retirer la variable avec plus petit coeff
+  variables <- setdiff(variables, min_var)
+  
+  # Vérifier Q2cum
+  Q2cum <- max(pls_temp$Q2)
+  
+  if (Q2cum > best_Q2cum) {
+    best_Q2cum <- Q2cum
+    best_vars <- variables
+  }
+}
+
+which.max(pls_temp$Q2) #3
+
+cat("Meilleures variables PLS :", best_vars, "\n")
+cat("Q2cum max :", best_Q2cum, "\n")
+
+best_vars
+
+```
+
+#Validation Leave one out
+Vérifier que les indicateurs sélectionnés par la PLS ne dépendent pas d’un environnement particulier. Un indicateur est dit robuste / cohérent s’il est sélectionné dans plus de 50 % des PLS faites en leave-one-out.
+Pour chaque exp i parmi N, 
+1. je la retire
+2. Je  refais toute la procédure PLS + backward-Q²cum
+3. je récupère la liste finale des variables sélectionnées
+4. je compte combien de fois chaque variable est sélectionnée
+But : éviter les variables fortement dépendant d'une expérience, d'un contexte particulier
+
+
+```{r}
+n_env <- nrow(X)
+selection_count <- setNames(rep(0, ncol(X)), colnames(X))
+
+for (i in 1:n_env) {
+
+  # Retirer l'environnement i
+  X_loo <- X[-i, ]
+  Y_loo <- Y[-i]
+
+  variables <- colnames(X_loo)
+  best_Q2cum <- -Inf #initialisation pour être sûre qu'il prenne la valeur max
+  best_vars_loo <- variables
+
+  # Backward-Q²cum sur les N-1 environnements
+  while (length(variables) > 1) {
+
+    pls_temp <- plsreg1(X_loo[, variables],Y_loo,comps = nrow(X_loo) - 1,crosval = TRUE)
+
+    # Coefficients de régression (sans intercept)
+    coefs <- pls_temp$reg.coefs
+    coefs <- coefs[names(coefs) != "Intercept"]
+
+    # Q²cum
+    Q2cum <- max(pls_temp$Q2)
+
+    # Mise à jour du meilleur modèle
+    if (Q2cum > best_Q2cum) {
+      best_Q2cum <- Q2cum
+      best_vars_loo <- variables
+    }
+
+    # Retirer la variable la moins contributive
+    min_var <- names(coefs)[which.min(abs(coefs))]
+    variables <- setdiff(variables, min_var)
+  }
+
+  # Incrémenter le compteur de sélection
+  selection_count[best_vars_loo] <- selection_count[best_vars_loo] + 1
+}
+
+```
+
+
+#Confidence index = nb de fois où la var j est sélectionnée / N
+Plus l'indice est proche de 1, plus il a été sélectionné pendant la phase de leave one out, c'est un indicateur fiable pour la prédiction 
+```{r}
+confidence_index <- selection_count / n_env
+names(confidence_index)
+confidence_index
+```
+
+#Variables robustes
+On ne garde que les variables robustes, qui sont sélectionnées dans plus de la moitié des validations LOO
+```{r}
+consistent_vars <- names(confidence_index[confidence_index > 0.5]) #Thèse
+consistent_vars #71 variables 
+```
+
+« Les variables consistantes présentant le plus fort indice de confiance sont les plus robustes pour prédire le rendement et contribuent fortement à la variance expliquée par le modèle PLS. »
+
+```{r}
+# Extraire l'indice de confiance des variables robustes
+confidence_consistent <- confidence_index[consistent_vars]
+
+# Créer un tableau
+robust_vars_table <- data.frame(
+  Variable = consistent_vars,
+  Confidence_Index = confidence_consistent
+)
+
+# Afficher le tableau
+print(robust_vars_table)
+
+```
 
