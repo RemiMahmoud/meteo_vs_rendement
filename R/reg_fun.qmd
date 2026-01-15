@@ -43,9 +43,8 @@ dt_meteo <- read.csv("data/meteo_lm") |>
   pivot_wider(names_from = date_ref, values_from = c(TEMP_T_Q, E.HYD_WSC, RAYO_Cumul_RG))
 
 info <- read.csv("data/dt_anova") |> 
-  rename(exp = PARTENAIRE,
-         year = Year.a.) |> 
-  select(exp, year, Latitude, Longitude, AN, ADB, NNI, Ntotal, WSC_MAX, WSC_I, DBI, DAI, RO, RF)
+  rename(exp = PARTENAIRE) |> 
+  select(exp, Year, Latitude, Longitude, AN, ADB, NNI, Ntotal, WSC_MAX, WSC_I, DBI, DAI, RO, RF)
 
 landmark <- read.csv("data/landmarks.csv") |> 
   rename(exp = PARTENAIRE) |> 
@@ -57,17 +56,12 @@ dta <- rendement |>
   left_join(landmark) |> 
   left_join(dt_meteo) |> 
   arrange(match(exp, noms)) |> 
-  filter(!is.na(year)) |> 
+  filter(!is.na(Year)) |> 
   mutate(variety = as.factor(variety),
-         year = as.factor(year))
+         Year = as.factor(Year))
 
 ```
 
-
-```{r data regression}
-
-
-```
 
 
 x  ajouter les autres variables scalaires
@@ -79,120 +73,11 @@ plot des betas et des gammas avec les couleurs des périodes
 
 
 
-
-
-
-```{r}
-
-
-Y <- dta$value
-X1 <- as.matrix(dta[, 23:306])
-X2 <- as.matrix(dta[, 307:590])
-X3 <- as.matrix(dta[, 591:874])
-X_f <- list(X1 = X1, X2 = X2, X3 = X3)
-X_s = as.list(dta[, 4:22])
-Kx = 30
-nfold = 10
-
-data_var <- X_f[[1]]
-
-reg <- fRegress(Y, X_f = list(), X_s = list(), brute = T, nbsplines = 30, date = 11219:11502){
-  
-  ##### donnée fonctionelle en spline #####
-  
-  rangeval <- c(min(date), max(date)) # définition de l'échelle (les longueurs d'ondes)
-  nbasis <- nbsplines # Nombre de splines utilisées
-  basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis)
-  fdParobj <- fdPar(basisobj, lambda = 1e-3)
-  
-  
-  X_f_fd <- lapply(X_f, function(data_var) {
-    m <- apply(data_var, 1, mean)
-    s <- apply(data_var - m, 1, sd)
-    
-    data_var <- (data_var - m) / s 
-    data_var <- as.matrix(data_var) 
-    
-    fdParobj <- fdPar(basisobj, lambda = 1e-3)
-    
-    fdsmooth <- smooth.basis(
-      argvals  = date,
-      y        = t(data_var),  # smooth.basis attend temps × individus
-      fdParobj = fdParobj
-    )
-    
-    
-    if(!brute){
-      
-    }
-    return(fdsmooth$fd)
-  })
-  
-  
-  
-  ##### data regression #####
-  
-  beta_basis <- create.bspline.basis(rangeval, nbasis = 15)
-  
-  betalist <- lapply(seq_along(X_f_fd), function(j) {
-    fdPar(beta_basis, lambda = 1e-1)
-  })
-  
-  
-  zmat <- if (length(X_s) > 0) {
-    do.call(cbind, X_s)
-  } else {
-    NULL
-  } 
-  
-  reg <- fRegress(
-    y        = Y,
-    xfdlist  = X_f_fd,
-    betalist = betalist,
-    zmat     = zmat
-  )
-  
-  reg$betaestlist[[1]]$fd #Coefficients fonctionnels
-  Y_hat <- reg$yhatfdobj #val ajusté
-  res <- Y - reg$yhatfdobj # residu
-  sqrt(mean((Y - res)^2))
-  
-  plot(reg$betaestlist[[3]]$fd,
-       xlab = "Temps",
-       ylab = expression(beta(t)),
-       main = "Coefficient fonctionnel β(t)")
-}
-
-
-
-
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ```{r}
 
 
 
-
-reg_fun <- function(Y, X_f = list(), X_s = list(), brut = F, Kx = 30, test = F, nfold = 10){
+reg_fun <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, test = F, nfold = 10){
   
   
   p_f <- length(X_f)
@@ -212,53 +97,7 @@ reg_fun <- function(Y, X_f = list(), X_s = list(), brut = F, Kx = 30, test = F, 
   } else if (p_f * p_s == 0) {
     formule <- paste0(formule_f, formule_s)
   } else {
-    formule <- paste0(formule_f, formule_s,
-                      collapse = " + ")
-  }
-  
-  # Formule complète
-  formule <- as.formula(paste("Y ~", formule))
-  
-  # Données pour pfr()
-  data_list <- c(list(Y = Y), setNames(X_f, X_names_f), setNames(X_s, X_names_s))
-  
-  
-  
-  fd_mod_final <- pfr(
-    formula = formule,
-    data = data_list
-  )
-  
-}
-```
-
-
-```{r}
-
-
-
-reg_fun <- function(Y, X_f = list(), X_s = list(), brut = F, Kx = 30, test = F, nfold = 10){
-  
-  
-  p_f <- length(X_f)
-  p_s <- length(X_s)
-  
-  X_names_f <- if (length(X_f)!=0){paste0("X_f", seq_len(p_f))} else {character(0)}
-  X_names_s <- if (length(X_s)!=0){paste0("X_s", seq_len(p_s))} else {character(0)}
-  
-  # Construire la partie droite de la formule
-  formule_f <- paste(paste0("lf(", X_names_f, ", k = ", Kx, ", bs = 'ps')"),
-                     collapse = " + ")
-  
-  formule_s <- paste(paste0(X_names_s), collapse = " + ")
-  
-  if (p_f + p_s == 0){
-    stop("Formule vide")
-  } else if (p_f * p_s == 0) {
-    formule <- paste0(formule_f, formule_s)
-  } else {
-    formule <- paste0(formule_f, formule_s,
-                      collapse = " + ")
+    formule <- paste0(formule_f, " + ", formule_s)
   }
   
   # Formule complète
@@ -290,7 +129,7 @@ reg_fun <- function(Y, X_f = list(), X_s = list(), brut = F, Kx = 30, test = F, 
       }
     })
     
-    data_list_train <- lapply(data_list, function(x) {
+    data_list_test <- lapply(data_list, function(x) {
       if (is.null(dim(x))) {
         # vecteur
         x[test_id]
@@ -340,8 +179,98 @@ reg_fun <- function(Y, X_f = list(), X_s = list(), brut = F, Kx = 30, test = F, 
 }
 
 
+```
+
+
+```{r}
+
+Y <- dta$value
+X1 <- as.matrix(dta[, 23:306])
+X2 <- as.matrix(dta[, 307:590])
+X3 <- as.matrix(dta[, 591:874])
+X_f <- list(X1 = X1, X2 = X2, X3 = X3)
+rm(X1, X2, X3)
+X_s = as.data.frame(dta[, 4:22])
+Kx = 30
+nfold = 10
+brute = F
+nharm = 5
+nbsplines = 30
+date = 11219:11502
+
+
+
+res_X1 <- reg_fun(Y, X_f = list(X1 = X1), X_s = X_s)
+print("a")
+res_X2 <- reg_fun(Y, X_f = list(X2 = X2), X_s = X_s)
+print("b")
+res_X3 <- reg_fun(Y, X_f = list(X3 = X3), X_s = X_s)
+print("c")
+res_X12 <- reg_fun(Y, X_f = list(X1 = X1, X2 = X2), X_s = X_s)
+print("d")
+res_X13 <- reg_fun(Y, X_f = list(X1 = X1, X3 = X3), X_s = X_s)
+print("e")
+res_X23 <- reg_fun(Y, X_f = list(X2 = X2, X3 = X3), X_s = X_s)
+print("f")
+res_X123 <- reg_fun(Y, X_f = list(X1 = X1, X2 = X2, X3 = X3), X_s = X_s)
+
+
+c(X1 = res_X1$MSEP,
+  X2 = res_X2$MSEP,
+  X1_X2 = res_X12$MSEP)
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -349,84 +278,102 @@ reg_fun <- function(Y, X_f = list(), X_s = list(), brut = F, Kx = 30, test = F, 
 
 
 Y <- dta$value
-X1 <- as.matrix(dta[, 5:288])
-X2 <- as.matrix(dta[, 289:572])
-X3 <- as.matrix(dta[, 573:856])
-X_f <- list(X1 = X1, X2 = X2, X3 = X3)
-X_s = list()
-Kx = 30
+X1 <- as.matrix(dta[, 23:306])
+X2 <- as.matrix(dta[, 307:590])
+X3 <- as.matrix(dta[, 591:874])
+X_f <- list(X1 = X1, X2 = X2)
+X_s = as.list(dta[, 4:22]) 
 nfold = 10
+brute = F
+nharm = 5
+nbsplines = 30
+date = 11219:11502
 
+data_var <- X_f[[1]]
 
+reg <- fRegress(Y, X_f = list(), X_s = list(), brute = F, nharm = 5, nbsplines = 30, date = 11219:11502){
+  
+  ##### donnée fonctionelle en spline #####
+  
+  rangeval <- c(min(date), max(date)) # définition de l'échelle (les longueurs d'ondes)
+  nbasis <- nbsplines # Nombre de splines utilisées
+  basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis)
+  fdParobj <- fdPar(basisobj, lambda = 1e-3)
+  
+  
+  X_f_fd <- lapply(X_f, function(data_var) {
+    m <- apply(data_var, 1, mean)
+    s <- apply(data_var - m, 1, sd)
+    
+    data_var <- (data_var - m) / s 
+    data_var <- as.matrix(data_var) 
+    
+    fdParobj <- fdPar(basisobj, lambda = 1e-3)
+    
+    fdsmooth <- smooth.basis(
+      argvals  = date,
+      y        = t(data_var),  # smooth.basis attend temps × individus
+      fdParobj = fdParobj
+    )
+    
+    if(brute){
+      fdsmooth <- pca.fd(fdsmooth, nharm = nharm)
+    }
+    return(fdsmooth$fd)
+  })
+  
+  
+  
+  ##### data regression #####
+  
+  beta_basis <- create.bspline.basis(rangeval, nbasis = 15)
+  
+  betalist <- lapply(seq_along(X_f_fd), function(j) {
+    fdPar(beta_basis, lambda = 1e-1)
+  })
+  
+  
+  zmat <- if (length(X_s) > 0) {
+    do.call(cbind, X_s)
+  } else {
+    NULL
+  } 
+  zmat <- cbind(Intercept = 1, zmat)
+  
+  reg <- fRegress(
+    y        = Y,
+    xfdlist  = X_f_fd,
+    betalist = betalist,
+    zmat     = zmat
+  )
+  
+  reg
+  reg$betaestlist[[1]]$fd #Coefficients fonctionnels
+  Y_hat <- reg$yhatfdobj #val ajusté
+  res <- Y - reg$yhatfdobj # residu
+  sqrt(mean((Y - res)^2))
+  
+  par(mfrow = c(3, 1))
+  for (j in seq_len(3)) {
+    plot(reg$betaestlist[[j]]$fd,
+         main = paste("β", j, "(t)"),
+         ylab = "")
+  }
+  plotbeta(reg$betaestlist[[1]])
+}
 
-data_list_train <- c(
-  list(Y = Y[train_id]),
-  if (length(X_f) > 0)
-    setNames(lapply(X_f, function(x) as.matrix(x[train_id])), X_names_f)
-  else
-    list(),
-  if (length(X_s) > 0)
-    setNames(lapply(X_s, function(x) as.matrix(x[train_id])), X_names_s)
-  else
-    list()
+zmat <- cbind("(Intercept)" = 1, Z1, Z2)
+
+reg <- fRegress(
+  y = Y,
+  xfdlist = X_f_fd,
+  betalist = betalist,
+  zmat = zmat
 )
 
-
-plot(reg_fun(Y, X_f))
+reg$betaestlist$const
 
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
