@@ -77,7 +77,7 @@ plot des betas et des gammas avec les couleurs des périodes
 
 
 
-reg_fun <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, test = F, nfold = 10){
+reg_fun_pfr <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, test = F, nfold = 10){
   
   
   p_f <- length(X_f)
@@ -87,10 +87,9 @@ reg_fun <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, test
   X_names_s <- if (length(X_s)!=0){paste0("X_s", seq_len(p_s))} else {character(0)}
   
   # Construire la partie droite de la formule
-  formule_f <- paste(paste0("lf(", X_names_f, ", k = ", Kx, ", bs = 'ps')"),
-                     collapse = " + ")
+  formule_f <- paste(paste0("lf(", X_names_f, ", k = ", Kx, ", bs = 'ps')"), collapse = " + ")
   
-  formule_s <- paste(paste0(X_names_s), collapse = " + ")
+  formule_s <- paste(paste0(names(X_s)), collapse = " + ")
   
   if (p_f + p_s == 0){
     stop("Formule vide")
@@ -104,7 +103,18 @@ reg_fun <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, test
   formule <- as.formula(paste("Y ~", formule))
   
   # Données pour pfr()
-  data_list <- c(list(Y = Y), setNames(X_f, X_names_f), setNames(X_s, X_names_s))
+  data_list <- c(
+    list(Y = Y),
+    setNames(X_f, X_names_f),
+    as.list(X_s))
+  
+  # donnees
+  X_f <- lapply(X_f, function(data_var) {
+    m <- mean(data_var)
+    s <- sd(data_var - m)
+    
+    data_var <- (data_var - m) / s 
+    data_var <- as.matrix(data_var)})
   
   
   segments <- cvsegments(length(Y), nfold)
@@ -128,6 +138,7 @@ reg_fun <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, test
         x[train_id, , drop = FALSE]
       }
     })
+    data_train <- as.data.frame(data_list_train)
     
     data_list_test <- lapply(data_list, function(x) {
       if (is.null(dim(x))) {
@@ -139,13 +150,18 @@ reg_fun <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, test
       }
     })
     
-    fd_mod_final <- pfr(
+    
+    # stopifnot(all(sapply(data_list, nrow) == length(Y)))
+    # stopifnot(!anyNA(data_list))
+    # stopifnot(all(sapply(X_s, sd) > 0))
+    
+    fd_mod <- pfr(
       formula = formule,
       data = data_list_train
     )
     
     cvpred[test_id] <- predict(
-      fd_mod_final,
+      fd_mod,
       newdata = data_list_test
     )
   }
@@ -170,7 +186,7 @@ reg_fun <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, test
   #Appel de la MSEP avec $MSEP
   result$MSEP <- round(MSEP, 2)
   #Appel de la régression fonctionnelle en sortie de fonction avec $model_fun_out
-  result$model_fun_out <- fd_mod_final
+  result$model_fun_out <- fd_mod
   #Appel des résidus des régressions avec $model_fun_residus
   result$model_fun_residus <- Y - cvpred
   #Appel des prédictions avec $pred_fun_out
@@ -182,6 +198,8 @@ reg_fun <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, test
 ```
 
 
+
+
 ```{r}
 
 Y <- dta$value
@@ -189,8 +207,8 @@ X1 <- as.matrix(dta[, 23:306])
 X2 <- as.matrix(dta[, 307:590])
 X3 <- as.matrix(dta[, 591:874])
 X_f <- list(X1 = X1, X2 = X2, X3 = X3)
-rm(X1, X2, X3)
-X_s = as.data.frame(dta[, 4:22])
+# rm(X1, X2, X3)
+X_s = as.data.frame(dta[, 6:22])  # pas pris les facteurs
 Kx = 30
 nfold = 10
 brute = F
@@ -200,24 +218,65 @@ date = 11219:11502
 
 
 
-res_X1 <- reg_fun(Y, X_f = list(X1 = X1), X_s = X_s)
+res_X1 <- reg_fun_pfr(Y, X_f = list(X1 = X1), X_s = X_s)
 print("a")
-res_X2 <- reg_fun(Y, X_f = list(X2 = X2), X_s = X_s)
+res_X2 <- reg_fun_pfr(Y, X_f = list(X2 = X2), X_s = X_s)
 print("b")
-res_X3 <- reg_fun(Y, X_f = list(X3 = X3), X_s = X_s)
+res_X3 <- reg_fun_pfr(Y, X_f = list(X3 = X3), X_s = X_s)
 print("c")
-res_X12 <- reg_fun(Y, X_f = list(X1 = X1, X2 = X2), X_s = X_s)
+res_X12 <- reg_fun_pfr(Y, X_f = list(X1 = X1, X2 = X2), X_s = X_s)
 print("d")
-res_X13 <- reg_fun(Y, X_f = list(X1 = X1, X3 = X3), X_s = X_s)
+res_X13 <- reg_fun_pfr(Y, X_f = list(X1 = X1, X3 = X3), X_s = X_s)
 print("e")
-res_X23 <- reg_fun(Y, X_f = list(X2 = X2, X3 = X3), X_s = X_s)
+res_X23 <- reg_fun_pfr(Y, X_f = list(X2 = X2, X3 = X3), X_s = X_s)
 print("f")
-res_X123 <- reg_fun(Y, X_f = list(X1 = X1, X2 = X2, X3 = X3), X_s = X_s)
+res_X123 <- reg_fun_pfr(Y, X_f = list(X1 = X1, X2 = X2, X3 = X3), X_s = X_s)
 
 
 c(X1 = res_X1$MSEP,
   X2 = res_X2$MSEP,
-  X1_X2 = res_X12$MSEP)
+  X3 = res_X2$MSEP, 
+  X12 = res_X12$MSEP,
+  X13 = res_X13$MSEP,
+  X23 = res_X23$MSEP,
+  X123 = res_X123$MSEP)
+
+c(X1 = res_X1$err_relative,
+  X2 = res_X2$err_relative,
+  X3 = res_X2$err_relative, 
+  X12 = res_X12$err_relative,
+  X13 = res_X13$err_relative,
+  X23 = res_X23$err_relative,
+  X123 = res_X123$err_relative)
+
+summary(res_X123$model_fun_out)
+
+
+err_uni <- sapply(X_s, function(z) {
+  reg_fun(Y, X_f = X_f, X_s = list(z))$MSEP
+})
+
+selected <- list()
+remaining <- X_s_filtrees
+
+current_msep <- reg_fun(Y, X_f = X_f, X_s = selected)$MSEP
+
+repeat {
+  gains <- sapply(remaining, function(z) {
+    reg_fun(Y, X_f = X_f, X_s = c(selected, list(z)))$MSEP
+  })
+  
+  best <- which.min(gains)
+  if (gains[best] < current_msep) {
+    selected <- c(selected, remaining[best])
+    remaining <- remaining[-best]
+    current_msep <- gains[best]
+  } else break
+}
+
+summary(fd_mod_final)
+summary(fd_mod_final)$p.table
+
 
 ```
 
