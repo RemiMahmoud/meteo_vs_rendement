@@ -60,6 +60,8 @@ dta <- rendement |>
   mutate(variety = as.factor(variety),
          Year = as.factor(Year))
 
+
+summary(dta[, 3:22])
 ```
 
 
@@ -71,13 +73,9 @@ sort le rmsep, gain relatif (pour la cv)
 qualité avec le modèle complet, gain relatif complet
 plot des betas et des gammas avec les couleurs des périodes
 
+```{r reg_fun_pfr}
 
-
-```{r}
-
-
-
-reg_fun_pfr <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, test = F, nfold = 10){
+reg_fun_pfr <- function(Y, X_f = list(), X_s = data.frame(), Kx = 30){
   
   
   p_f <- length(X_f)
@@ -87,8 +85,14 @@ reg_fun_pfr <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, 
   X_names_s <- if (length(X_s)!=0){paste0("X_s", seq_len(p_s))} else {character(0)}
   
   # Construire la partie droite de la formule
-  formule_f <- paste(paste0("lf(", X_names_f, ", k = ", Kx, ", bs = 'ps')"), collapse = " + ")
-  
+  formule_f <- if (length(X_names_f) == 0) {
+    ""
+  } else {
+    paste(
+      paste0("lf(", X_names_f, ", k = ", Kx, ", bs = 'ps')"),
+      collapse = " + "
+    )
+  }  
   formule_s <- paste(paste0(names(X_s)), collapse = " + ")
   
   if (p_f + p_s == 0){
@@ -117,11 +121,117 @@ reg_fun_pfr <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, 
     data_var <- as.matrix(data_var)})
   
   
-  segments <- cvsegments(length(Y), nfold)
+  fd_mod <- pfr(
+      formula = formule,
+      data = data_list
+    )
+  
+  return(fd_mod)
+}
+
+```
+
+
+```{r}
+Y <- dta$value
+X1 <- as.matrix(dta[, 23:306])
+X2 <- as.matrix(dta[, 307:590])
+X3 <- as.matrix(dta[, 591:874])
+X_f <- list(X1 = X1, X2 = X2, X3 = X3)
+# rm(X1, X2, X3)
+X_s = as.data.frame(dta[, 6:22])  # pas pris les facteurs
+Kx = 30
+nfold = 10
+brute = F
+nharm = 5
+# nbsplines = 30
+
+
+
+fd_mod <- reg_fun_pfr(Y, X_f = list(X1 = X1, X2 = X2, X3 = X3), X_s = X_s)
+summary(fd_mod)
+beta_hat <- plot(fd_mod, select = 2, se = FALSE, rug = FALSE)
+plot(beta_hat[[1]]$fit)
+plot(beta_hat[[2]]$fit)
+plot(beta_hat[[3]]$fit)
+
+
+```
+
+
+idées
+transformer les beta en splines, puis recuperer les coefs , puis faire selection variable (un elastic net) dessus avec les variables scalaires en plus
+
+recupere coef de l'acp puis faire selection variable (un elastic net) dessus avec les variables scalaires en plus
+
+faire de la selection de variables, scalaire, fonctionnelle
+
+
+
+
+
+
+
+
+
+
+
+
+```{r reg_fun_pfr_cv}
+
+
+
+reg_fun_pfr_cv <- function(Y, X_f = list(), X_s = data.frame(), Kx = 30, nfold = 10){
+  
+  
+  p_f <- length(X_f)
+  p_s <- length(X_s)
+  
+  X_names_f <- if (length(X_f)!=0){paste0("X_f", seq_len(p_f))} else {character(0)}
+  X_names_s <- if (length(X_s)!=0){paste0("X_s", seq_len(p_s))} else {character(0)}
+  
+  # Construire la partie droite de la formule
+  formule_f <- if (length(X_names_f) == 0) {
+    ""
+  } else {
+    paste(
+      paste0("lf(", X_names_f, ", k = ", Kx, ", bs = 'ps')"),
+      collapse = " + "
+    )
+  }  
+  formule_s <- paste(paste0(names(X_s)), collapse = " + ")
+  
+  if (p_f + p_s == 0){
+    stop("Formule vide")
+  } else if (p_f * p_s == 0) {
+    formule <- paste0(formule_f, formule_s)
+  } else {
+    formule <- paste0(formule_f, " + ", formule_s)
+  }
+  
+  # Formule complète
+  formule <- as.formula(paste("Y ~", formule))
+  
+  # Données pour pfr()
+  data_list <- c(
+    list(Y = Y),
+    setNames(X_f, X_names_f),
+    as.list(X_s))
+  
+  # donnees
+  X_f <- lapply(X_f, function(data_var) {
+    m <- mean(data_var)
+    s <- sd(data_var - m)
+    
+    data_var <- (data_var - m) / s 
+    data_var <- as.matrix(data_var)})
+  
+  
+  segments <- cvsegments(length(Y), length(Y))
   cvpred_nul <- numeric(length(Y))
   cvpred <- numeric(length(Y))
   
-  for (k in 1:nfold) {
+  for (k in 1:length(Y)) {
     # indice
     train_id <- setdiff(seq_len(length(Y)), segments[[k]])
     test_id  <- segments[[k]]
@@ -138,7 +248,6 @@ reg_fun_pfr <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, 
         x[train_id, , drop = FALSE]
       }
     })
-    data_train <- as.data.frame(data_list_train)
     
     data_list_test <- lapply(data_list, function(x) {
       if (is.null(dim(x))) {
@@ -178,15 +287,13 @@ reg_fun_pfr <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, 
   RMSEP <- sqrt(MSEP)
   
   # gain relatif
-  err_relative <- round((MSEP_nul - MSEP)/MSEP_nul*100, 2)
+  gain_pc <- round((MSEP_nul - MSEP)/MSEP_nul*100, 2)
   
   result <- list()
   #Appel du gain avec $err_relative
-  result$err_relative <- err_relative
+  result$gain_pc <- gain_pc
   #Appel de la MSEP avec $MSEP
   result$MSEP <- round(MSEP, 2)
-  #Appel de la régression fonctionnelle en sortie de fonction avec $model_fun_out
-  result$model_fun_out <- fd_mod
   #Appel des résidus des régressions avec $model_fun_residus
   result$model_fun_residus <- Y - cvpred
   #Appel des prédictions avec $pred_fun_out
@@ -196,6 +303,53 @@ reg_fun_pfr <- function(Y, X_f = list(), X_s = data.frame(), brut = F, Kx = 30, 
 
 
 ```
+
+
+```{r}
+
+
+res_X1 <- reg_fun_pfr_cv(Y, X_f = list(X1 = X1))
+res_X2 <- reg_fun_pfr_cv(Y, X_f = list(X2 = X2))
+res_X3 <- reg_fun_pfr_cv(Y, X_f = list(X3 = X3))
+res_X12 <- reg_fun_pfr_cv(Y, X_f = list(X1 = X1, X2 = X2))
+res_X13 <- reg_fun_pfr_cv(Y, X_f = list(X1 = X1, X3 = X3))
+res_X23 <- reg_fun_pfr_cv(Y, X_f = list(X2 = X2, X3 = X3))
+res_X123 <- reg_fun_pfr_cv(Y, X_f = list(X1 = X1, X2 = X2, X3 = X3))
+
+gain_1 <- c(
+  X1 = res_X1$gain_pc,
+  X2 = res_X2$gain_pc,
+  X3 = res_X2$gain_pc, 
+  X12 = res_X12$gain_pc,
+  X13 = res_X13$gain_pc,
+  X23 = res_X23$gain_pc,
+  X123 = res_X123$gain_pc)
+
+res_X0 <- reg_fun_pfr_cv(Y, X_f = list(), X_s = X_s)
+res_X1 <- reg_fun_pfr_cv(Y, X_f = list(X1 = X1), X_s = X_s)
+res_X2 <- reg_fun_pfr_cv(Y, X_f = list(X2 = X2), X_s = X_s)
+res_X3 <- reg_fun_pfr_cv(Y, X_f = list(X3 = X3), X_s = X_s)
+res_X12 <- reg_fun_pfr_cv(Y, X_f = list(X1 = X1, X2 = X2), X_s = X_s)
+res_X13 <- reg_fun_pfr_cv(Y, X_f = list(X1 = X1, X3 = X3), X_s = X_s)
+res_X23 <- reg_fun_pfr_cv(Y, X_f = list(X2 = X2, X3 = X3), X_s = X_s)
+res_X123 <- reg_fun_pfr_cv(Y, X_f = list(X1 = X1, X2 = X2, X3 = X3), X_s = X_s)
+
+
+gain_2 <- c(
+  X0 = res_X0$gain_pc,
+  X1 = res_X1$gain_pc,
+  X2 = res_X2$gain_pc,
+  X3 = res_X2$gain_pc, 
+  X12 = res_X12$gain_pc,
+  X13 = res_X13$gain_pc,
+  X23 = res_X23$gain_pc,
+  X123 = res_X123$gain_pc)
+```
+
+
+
+
+
 
 
 
@@ -214,56 +368,154 @@ nfold = 10
 brute = F
 nharm = 5
 nbsplines = 30
-date = 11219:11502
+# date = 11219:11502
+
+
+lm_mod_init <- lm(value~., data = dta[,3:22])
+summary(lm_mod_init)
+anova(lm_mod_init)
+
+step(lm_mod_init, direction = "both",criterion="AIC")
+
+library(glmnet)
+x <- as.matrix(dta[, 4:22])
+y <- dta[, 3]
+loglambda <- seq(10,-10,length=100) 
+alphas <- seq(0, 1, by = 0.1)
+
+
+cv_errors <- numeric(length(alphas))
+lambda_min <- numeric(length(alphas))
+
+for (i in seq_along(alphas)) {
+  cv <- cv.glmnet(
+    x, y,
+    alpha = alphas[i],
+    nfolds = 10,
+    lambda=exp(loglambda)
+  )
+  cv_errors[i] <- min(cv$cvm)
+  lambda_min[i] <- cv$lambda.min
+}
+
+best_alpha <- alphas[which.min(cv_errors)]
+best_alpha
+
+
+best_lambda <- lambda_min[which.min(cv_errors)]
+best_lambda
+
+final_mod <- glmnet(
+  x, y,
+  alpha = best_alpha,
+  lambda = best_lambda
+)
+
+coef(final_mod)
+plot(final_mod, xvar = "lambda")
+plot(cvmod)
 
 
 
-res_X1 <- reg_fun_pfr(Y, X_f = list(X1 = X1), X_s = X_s)
+
+
+
+
+
+
+
+cvpred = matrix(0,nrow=nrow(dta),ncol=100) 
+#création des segments
+segments = cvsegments(nrow(dta),10) 
+#Pour chaque segment k:
+for (k in 1:10) {
+   trainx = x[-segments[[k]],]
+   trainy = y[-segments[[k]]]
+   testx = x[segments[[k]],]
+   #Calcul du MSEP pour chaque lambda sur les données train
+   cvmod = cv.glmnet(trainx,trainy,alpha=1,lambda=exp(loglambda))
+   #Ajustement de modèles pour les différent lambda
+   mod = glmnet(trainx,trainy,alpha=1,lambda=exp(loglambda))
+   #prédiction pour le lambda minimum sur l'échantillon test ie: celui du kième 
+   #segment
+   cvpred[segments[[k]],] = predict(mod,newx=testx)[,which.min(cvmod$cvm)] 
+   print(paste("Segment ",k,sep=""))
+}
+#Calcul de MSEP
+MSEP = mean((dta$value-cvpred)^2)
+
+
+
+cvmod <- cv.glmnet(
+  x, y,
+  alpha = 0,          # LASSO
+  nfolds = 10,
+  standardize = TRUE
+)
+coef(cvmod, s = "lambda.min")
+best_lambda <- cvmod$lambda.min
+best_lambda
+
+
+final_mod <- glmnet(
+  x, y,
+  alpha = 1,
+  lambda = best_lambda
+)
+
+coef(final_mod)
+cvmod$cvm
+
+print("0")
+res_X1 <- reg_fun_pfr(Y, X_f = list(X1 = X1))
 print("a")
-res_X2 <- reg_fun_pfr(Y, X_f = list(X2 = X2), X_s = X_s)
+res_X2 <- reg_fun_pfr(Y, X_f = list(X2 = X2))
 print("b")
-res_X3 <- reg_fun_pfr(Y, X_f = list(X3 = X3), X_s = X_s)
+res_X3 <- reg_fun_pfr(Y, X_f = list(X3 = X3))
 print("c")
-res_X12 <- reg_fun_pfr(Y, X_f = list(X1 = X1, X2 = X2), X_s = X_s)
+res_X12 <- reg_fun_pfr(Y, X_f = list(X1 = X1, X2 = X2))
 print("d")
-res_X13 <- reg_fun_pfr(Y, X_f = list(X1 = X1, X3 = X3), X_s = X_s)
+res_X13 <- reg_fun_pfr(Y, X_f = list(X1 = X1, X3 = X3))
 print("e")
-res_X23 <- reg_fun_pfr(Y, X_f = list(X2 = X2, X3 = X3), X_s = X_s)
+res_X23 <- reg_fun_pfr(Y, X_f = list(X2 = X2, X3 = X3))
 print("f")
+
+
+res_X0 <- reg_fun_pfr(Y, X_f = list(), X_s = X_s)
+res_X1 <- reg_fun_pfr(Y, X_f = list(X1 = X1), X_s = X_s)
+res_X2 <- reg_fun_pfr(Y, X_f = list(X2 = X2), X_s = X_s)
+res_X3 <- reg_fun_pfr(Y, X_f = list(X3 = X3), X_s = X_s)
+res_X12 <- reg_fun_pfr(Y, X_f = list(X1 = X1, X2 = X2), X_s = X_s)
+res_X13 <- reg_fun_pfr(Y, X_f = list(X1 = X1, X3 = X3), X_s = X_s)
+res_X23 <- reg_fun_pfr(Y, X_f = list(X2 = X2, X3 = X3), X_s = X_s)
 res_X123 <- reg_fun_pfr(Y, X_f = list(X1 = X1, X2 = X2, X3 = X3), X_s = X_s)
 
 
-c(X1 = res_X1$MSEP,
-  X2 = res_X2$MSEP,
-  X3 = res_X2$MSEP, 
-  X12 = res_X12$MSEP,
-  X13 = res_X13$MSEP,
-  X23 = res_X23$MSEP,
-  X123 = res_X123$MSEP)
-
-c(X1 = res_X1$err_relative,
-  X2 = res_X2$err_relative,
-  X3 = res_X2$err_relative, 
-  X12 = res_X12$err_relative,
-  X13 = res_X13$err_relative,
-  X23 = res_X23$err_relative,
-  X123 = res_X123$err_relative)
+gain_2 <- c(X0 = res_X0$gain_pc,
+  X1 = res_X1$gain_pc,
+  X2 = res_X2$gain_pc,
+  X3 = res_X2$gain_pc, 
+  X12 = res_X12$gain_pc,
+  X13 = res_X13$gain_pc,
+  X23 = res_X23$gain_pc,
+  X123 = res_X123$gain_pc)
 
 summary(res_X123$model_fun_out)
+plot(res_X123$model_fun_out)
 
 
 err_uni <- sapply(X_s, function(z) {
-  reg_fun(Y, X_f = X_f, X_s = list(z))$MSEP
+  reg_fun_pfr(Y, X_f = X_f, X_s = list(z))$MSEP
 })
 
 selected <- list()
 remaining <- X_s_filtrees
 
-current_msep <- reg_fun(Y, X_f = X_f, X_s = selected)$MSEP
+current_msep <- reg_fun_pfr(Y, X_f = X_f, X_s = selected)$MSEP
 
 repeat {
   gains <- sapply(remaining, function(z) {
-    reg_fun(Y, X_f = X_f, X_s = c(selected, list(z)))$MSEP
+    reg_fun_pfr(Y, X_f = X_f, X_s = c(selected, list(z)))$MSEP
   })
   
   best <- which.min(gains)
@@ -435,316 +687,4 @@ reg$betaestlist$const
 ```
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-```{r}
-
-
-# Exemple pour TEMP_T_Q :
-temp_data <- as.matrix(dt_meteo[, grep("TEMP_T_Q_", colnames(dt_meteo))])
-rownames(temp_data) <- dt_meteo$DATE_s
-
-# Créer un objet fdata
-temp_fdata <- fdata(temp_data, argvals = dt_meteo$DATE)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Y <- dta$value
-X1 <- as.matrix(dta[, 5:288])
-X2 <- as.matrix(dta[, 289:572])
-X3 <- as.matrix(dta[, 573:856])
-
-
-
-
-fd_mod <- pfr(
-  Y ~ lf(X1, k = Kx, bs = "ps") + lf(X2, k = Kx, bs = "ps"),
-  data = list(
-    Y = Y[1:20],
-    X1 = X1[1:20,],
-    X2 = X2[1:20,]      )
-)
-
-
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-```{r}
-
-
-meteo_lm <- read.csv("data/meteo_lm") |>
-  select(DATE_s, exp, TEMP_T_Q, E.HYD_WSC, RAYO_Cumul_RG) |>
-  pivot_wider(names_from = exp, values_from = c(TEMP_T_Q, E.HYD_WSC, RAYO_Cumul_RG))
-
-meteo_lm$DATE_s <- as.Date(meteo_lm$DATE_s)
-
-
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-```{r}
-fun_model <- function(X, Y, Kx = 50, nfold = 10) {
-  
-  #Création des segments
-  segments <- cvsegments(length(Y), nfold)
-  
-  ### Modèle nul ###
-  #Création d'un vecteur pour le receuil des valeurs prédites
-  cvpred_nul <- numeric(length(Y))
-  print("a")
-  for (k in 1:nfold) {
-    print("b")
-    #Indices des observations pour l'ajustement (observations hors du segment k)
-    train_id <- setdiff(seq_len(length(Y)), segments[[k]])
-    #Indices des observations pour la prédiction (observations du segment k)
-    test_id  <- segments[[k]]
-    # Création du modèle nul qui est la moyenne de l'échantillon train
-    y_mean <- mean(Y[train_id])
-    # Prédiction sur l'échantillon test qui est donc la moyenne de l'échantillon train
-    cvpred_nul[test_id] <- y_mean
-  }
-  
-  #PRESS du modèle nul
-  PRESS_nul <- sum((Y - cvpred_nul)^2)
-  #MSEP du modèle nul
-  MSEP_nul <- mean((Y - cvpred_nul)^2)
-  #RMSEP du modèle nul
-  RMSEP_nul <- sqrt(MSEP_nul)
-  
-  ### Model fonctionnel ###
-  #création d'un vecteur qui contiendra les valeurs prédites
-  cvpred = numeric(length(Y))
-  #On ajuste le modèle sur tous les segments sauf le kième 
-  for (k in 1:nfold) {
-    #Indices des observations pour l'ajustement (observations hors du segment k)
-    train_id <- setdiff(seq_len(length(Y)), segments[[k]])
-    #Indices des observations pour la prédiction (observations du segment k)
-    test_id  <- segments[[k]]
-    #Ajustement du modèle sur l'echantillon train
-    fd_mod <- pfr(
-      Y ~ lf(X1, k = Kx, bs = "ps") + 
-        lf(X2, k = Kx, bs = "ps") + 
-        lf(X3, k = Kx, bs = "ps"),
-      data = list(
-        Y = Y[train_id],
-        X1 = X1[train_id,],
-        X2 = X2[train_id,],
-        X3 = X3[train_id,]
-      )
-    )
-    #prédiction sur l'échantillon test
-    cvpred[test_id] <- predict(
-      fd_mod,
-      newdata = list(X1 = X1[test_id,],
-                     X2 = X2[test_id,],
-                     X3 = X3[test_id,])
-    )
-  }
-  
-  #PRESS
-  PRESS <- sum((Y-cvpred)^2)
-  #MSEP
-  MSEP <- mean((Y-cvpred)^2)
-  #RMSEP
-  RMSEP <- sqrt(MSEP)
-  
-  ### Gain relative en % ###
-  err_relative <- (MSEP_nul - MSEP)/MSEP_nul*100
-  err_relative <- round(err_relative, 2)
-  
-  #Appel des sorties
-  #Liste contenant les résultats
-  result <- list()
-  #Appel du gain avec $err_relative
-  result$err_relative <- err_relative
-  #Appel de la MSEP avec $MSEP
-  result$MSEP <- round(MSEP, 2)
-  #Appel de la régression fonctionnelle en sortie de fonction avec $model_fun_out
-  result$model_fun_out <- fd_mod
-  #Appel des résidus des régressions avec $model_fun_residus
-  residus_vc <- Y - cvpred
-  result$model_fun_residus <- residus_vc
-  #Appel des prédictions avec $pred_fun_out
-  result$pred_fun_out <- cvpred
-  return(result)
-}
-
-# res_resid <- fun_model(X1, X2, X3, Y)
-
-
-
-
-```
-
-
-```{r}
-
-
-residus <- result$model_fun_residus
-pred <- result$pred_fun_out
-
-plot(pred, residus)
-
-
-#Représentation graphique résidus en fonction des prédictions
-plot_fun <- function(var) {
-  var_name <- deparse(substitute(var))
-  plot(table_pred[[var_name]], 
-       table_residus[[var_name]],
-       pch = 21,
-       bg = "red",
-       col = "black",
-       xlab = "Prédiction après VC",
-       ylab = "Résidus")
-}
-
-plot_fun(LWR)
-
-#ACP
-#ACP_res <- PCA(table_residus[c(-1)])
-
-
-```
-
-
-
-
-```{r}
-
-fd_mod_final <- pfr(
-  Y ~ lf(X1, k = Kx, bs = "ps") + 
-    lf(X2, k = Kx, bs = "ps"),
-  data = list(
-    Y = Y,
-    X1 = X1,
-    X2 = X2
-  )
-)
-
-
-summary(fd_mod_final)
-plot(fd_mod_final)
-
-class(fd_mod_final$smooth$`s(X1.tmat):L.X1`)
-
-
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-TU fais quoi ???
-```{r}
-
-#Graphique de la fonction des beta
-res_model <- lapply(Y_cols, function(i) {
-  Y <- NIRS_pheno_f[[i]]
-  res_model <- fun_model(X, Y)
-  model <- res_model$model_fun_out
-})
-
-names(res_model) <- colnames(NIRS_pheno_f[Y_cols])
-
-#Représentation graphique des fonctions des beta
-bhat.lf <- coef(res_model[["SR"]], n=100)
-bhat.lf$upper <- bhat.lf$value + 1.96*bhat.lf$se
-bhat.lf$lower <- bhat.lf$value - 1.96*bhat.lf$se
-fda::matplot(bhat.lf$X.argvals, bhat.lf[,c(2, 4, 5)], 
-             type = "l",
-             ylab=expression(paste(beta(t))), xlab="t")
-```
 
