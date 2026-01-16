@@ -114,15 +114,14 @@ library(plsdepot) #intègre le calcul de Q² cum en sortie, utilisé dans la th�
 # Séparer Y et X
 Y <- dt_anova$SY
 X <- dt_anova[, setdiff(names(dt_anova), "SY")]
+X <- subset(X, select = -c(WS_FLO,HT_FLO, PARTENAIRE))
+X <- X[,-(5:10)]
 X <- X[,-2]
-X <- X[,-(3:9)]
-X <- X[,-82]
-X <- subset(X, select = -c(WS_FLO,HT_FLO))
-View(X)
-colnames(X)
-
-summary(X)
 X$Year<- as.numeric(sub(".*-", "", X$Year))
+
+View(X)
+summary(X)
+
 ```
 
 WD_P300
@@ -170,12 +169,12 @@ Conserver le modèle avec Q²cum maximal, on mémorise la combinaison de variabl
 But :Éliminer progressivement les variables les moins importantes, identifier le sous-ensemble optimal de variables qui maximise la capacité prédictive du modèle
 
 ```{r}
-variables <- colnames(X)
+variables <- colnames(X_variete)
 best_Q2cum <- 0
 best_vars <- variables
 
 while (length(variables) > 1) {
-  pls_temp <- plsreg1(X[, variables], Y, comps = nrow(X)-1, crosval = TRUE)
+  pls_temp <- plsreg1(X_variete[, variables], Y_variete, comps = nrow(X_variete)-1, crosval = TRUE)
   coefs <- pls_temp$reg.coefs
   coefs <- coefs[names(coefs) != "Intercept"] 
   min_var <- variables[which.min(abs(coefs))]
@@ -190,11 +189,16 @@ while (length(variables) > 1) {
     best_Q2cum <- Q2cum
     best_vars <- variables
   }
+  
+  print(best_Q2cum)
+  print(best_vars)
+  
 }
 
-which.max(pls_temp$Q2) #3
+nb_components <- which.max(pls_temp$Q2) #3
+nb_components
 
-cat("Meilleures variables PLS :", best_vars, "\n")
+cat("Meilleures variables PLS :", best_vars, "\n") #63 var
 cat("Q2cum max :", best_Q2cum, "\n")
 
 best_vars
@@ -212,14 +216,14 @@ But : éviter les variables fortement dépendant d'une expérience, d'un context
 
 
 ```{r}
-n_env <- nrow(X)
-selection_count <- setNames(rep(0, ncol(X)), colnames(X))
+n_env <- nrow(X_variete)
+selection_count <- setNames(rep(0, ncol(X_variete)), colnames(X_variete))
 
 for (i in 1:n_env) {
 
   # Retirer l'environnement i
-  X_loo <- X[-i, ]
-  Y_loo <- Y[-i]
+  X_loo <- X_variete[-i, ]
+  Y_loo <- Y_variete[-i]
 
   variables <- colnames(X_loo)
   best_Q2cum <- -Inf #initialisation pour être sûre qu'il prenne la valeur max
@@ -267,7 +271,7 @@ confidence_index
 On ne garde que les variables robustes, qui sont sélectionnées dans plus de la moitié des validations LOO
 ```{r}
 consistent_vars <- names(confidence_index[confidence_index > 0.5]) #Thèse
-consistent_vars #71 variables 
+consistent_vars #61 variables 
 ```
 
 « Les variables consistantes présentant le plus fort indice de confiance sont les plus robustes pour prédire le rendement et contribuent fortement à la variance expliquée par le modèle PLS. »
@@ -285,5 +289,71 @@ robust_vars_table <- data.frame(
 # Afficher le tableau
 print(robust_vars_table)
 
+```
+
+
+```{r}
+results_env <- list(
+  best_vars = best_vars,
+  best_Q2cum = best_Q2cum,
+  nb_components = nb_components,
+  best_Q2cum = best_Q2cum,
+  selection_count = selection_count,
+  confidence_index = confidence_index,
+  consistent_vars = consistent_vars,
+  robust_vars_table = robust_vars_table)
+
+#saveRDS(results_env, file = "resultat/PLS_results_env.rds")
+
+results_env <- readRDS("PLS_results_env.rds")
+
+
+```
+
+
+#ajouter rendement par variete 
+```{r}
+rendement <- read.csv("data/rendement.csv")
+
+rendement <- rendement %>% 
+  select(-X) %>% 
+  filter(type == "SY",!is.na(value)) %>% 
+  mutate(variety = sub("^[^_]*_[^_]*_", "", variety))
+
+dt_anova_variete <- dt_anova %>%
+  left_join(rendement, by = c("PARTENAIRE" = "exp")) %>% 
+  select(-any_of("SY")) %>% 
+  rename(SY = value) %>%
+  select(-type)
+
+dt_anova_variete <- dt_anova_variete[-35,]
+
+View(dt_anova_variete)
+
+Y_variete <- dt_anova_variete$SY
+X_variete <- dt_anova_variete[, setdiff(names(dt_anova), "SY")] #toutes les liges de dt_anova sauf SY
+X_variete <- subset(X_variete , select = -c(WS_FLO,HT_FLO, PARTENAIRE))
+X_variete <- X_variete[,-(5:10)]
+X_variete <- X_variete[,-2]
+X_variete$Year<- as.numeric(sub(".*-", "", X_variete$Year))
+View(X_variete)
+colnames(X_variete)
+summary(X_variete)
+
+```
+
+```{r}
+results_variete <- list(
+  best_vars = best_vars,
+  best_Q2cum = best_Q2cum,
+  selection_count = selection_count,
+  confidence_index = confidence_index,
+  consistent_vars = consistent_vars,
+  robust_vars_table = robust_vars_table
+)
+
+#saveRDS(results_variete, file = "PLS_results_variete.rds")
+
+results_variete <- readRDS("PLS_results_variete.rds")
 ```
 
