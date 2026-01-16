@@ -5,6 +5,7 @@ format: html
 
 ```{r library}
 library(tidyverse)
+library(dplyr)
 library(fda)
 library(viridis)
 ```
@@ -142,7 +143,7 @@ plot_harmonique <- function(acpf, i, variable){
 ```
 
 ajouter sum montego aviso
-```{r plot_indiv}
+```{r plot_indiv_propre}
 
 plot_indiv <- function(acpf, type_rend, var, axe, variable){
   
@@ -209,6 +210,45 @@ plot_indiv(acpf,type_rend = "SY", var = "Montego", axe = c(1, 2), "E.HYD_WSC" )
 
 
 ```
+
+```{r}
+plot_indiv <- function(acpf, type_rend = "SY", var = "Aviso", axe = c(1, 2), variable){
+  
+    V <- paste0("V" ,axe)
+    
+    scores <- as.data.frame(acpf$scores)
+    scores$exp <- noms
+    scores <- scores |> 
+      left_join(rendement |> 
+              filter(type == type_rend,
+                     variety == var))
+  
+  if(length(axe) == 2){
+
+    scores |> 
+      ggplot(aes(x = .data[[V[1]]], y = .data[[V[2]]])) +
+      geom_point(aes(color = exp, size = value)) +  
+      geom_text(aes(label = exp), vjust = -1) +  # nom des sites au-dessus
+      theme_minimal() +
+      labs(x = paste0("Dimension ", axe[1], " : ", round(acpf$varprop[axe[1]], 2)*100, "%"),
+           y = paste0("Dimension ", axe[2], " : ", round(acpf$varprop[axe[2]], 2)*100, "%"),
+           title = paste0("Le rendement ", type_rend, " sur le plan de l'ACP (axes ", axe[1], " et ", axe[2], ") avec la variable ", as.character(variable)))
+    
+  }else if(length(axe) == 1){
+    
+        scores |> 
+      ggplot(aes(x = .data[[V[1]]], y = 0)) +
+      geom_point(aes(color = exp, size = value)) +  
+      geom_text(aes(label = exp), vjust = -1) +  # nom des sites au-dessus
+      theme_minimal() +
+      labs(x = paste0("Dimension ", axe[1], " : ", round(acpf$varprop[axe[1]], 2)*100, "%"),
+           y = "",
+           title = paste0("Le rendement ", type_rend, " sur l'axe de l'ACP (axe ", axe[1], ") avec la variable ", as.character(variable)))
+    
+  }
+}
+```
+
 
 
 ```{r fun_acpf plot}
@@ -382,7 +422,7 @@ plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F,
   } else {
     
     dta <- meteo_brute |> 
-      select(exp, DATE_s, {{variable}}) |> 
+      dplyr::select(exp, DATE_s, {{variable}}) |> 
       filter(is.null(experience) | exp %in% experience) |>
       mutate(DATE_s = as.numeric(as.Date(DATE_s)))
     
@@ -440,7 +480,7 @@ plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F,
         
         lm_v <- lm |> 
           filter(PARTENAIRE == "INRA11") |> 
-          select(DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s ) |> 
+          dplyr::select(DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s ) |> 
           as.vector() |> 
           unlist() |> 
           as.Date() |> 
@@ -481,10 +521,6 @@ plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F,
   }
   
 }
-
-plot_courbe("RAYO_SSI_Q", normaliser = F)
-
-
 
 
 ```
