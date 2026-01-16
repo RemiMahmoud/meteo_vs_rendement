@@ -9,6 +9,7 @@ library(fda)
 library(viridis)
 ```
 
+
 ```{r data}
 meteo_lm <- read.csv("data/meteo_lm")
 summary(meteo_lm)
@@ -22,6 +23,16 @@ periode_clim <- sub("_s$", "", periode_clim)
 rendement <- read.csv("data/rendement.csv") |>
   dplyr::select(-X) |> 
   dplyr::mutate(variety = sub("^[^_]*_[^_]*_", "", variety))
+
+meteo_brute <- read.csv("data/meteo_brute.csv")
+lm <- read.csv("data/landmarks.csv") |> 
+  mutate(DEBUT_EXP_sn = as.numeric(as.Date(DEBUT_EXP_s)),
+         DEBUT_CW_sn = as.numeric(as.Date(DEBUT_CW_s)),
+         FIN_CW_sn = as.numeric(as.Date(FIN_CW_s)),
+         DEBUT_FLO_sn = as.numeric(as.Date(DEBUT_FLO_s)),
+         FIN_FLO_sn = as.numeric(as.Date(FIN_FLO_s)),
+         FIN_EXP_sn = as.numeric(as.Date(FIN_EXP_s)),
+         DEBUT_FLO_sn = as.numeric(as.Date(DEBUT_FLO_s)))
 
 ```
 
@@ -102,8 +113,8 @@ plot_harmonique <- function(acpf, i, variable){
        ylab = paste("Valeur de la", num[i], "composante principale"))
   
   cols <- adjustcolor(
-  c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
-  alpha.f = 0.25)
+    c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+    alpha.f = 0.25)
   
   rect(ref_lm_v[-length(ref_lm_v)],  # xleft
        ylim[1],                # ybottom
@@ -135,17 +146,17 @@ ajouter sum montego aviso
 
 plot_indiv <- function(acpf, type_rend, var, axe, variable){
   
-    V <- paste0("V" ,axe)
-    
-    scores <- as.data.frame(acpf$scores)
-    scores$exp <- noms
-    scores <- scores |> 
-      left_join(rendement |> 
-              filter(type == type_rend,
-                     variety == var))
+  V <- paste0("V" ,axe)
+  
+  scores <- as.data.frame(acpf$scores)
+  scores$exp <- noms
+  scores <- scores |> 
+    left_join(rendement |> 
+                filter(type == type_rend,
+                       variety == var))
   
   if(length(axe) == 2){
-
+    
     scores |> 
       ggplot(aes(x = .data[[V[1]]], y = .data[[V[2]]])) +
       geom_point(aes(color = exp, size = value)) +
@@ -156,7 +167,7 @@ plot_indiv <- function(acpf, type_rend, var, axe, variable){
       scale_x_continuous(limits = c(-1000, 1000),breaks = seq(-1000, 1000, by = 200)) +
       scale_y_continuous(limits = c(-1000, 1000),breaks = seq(-1000, 1000, by = 200)) +
       guides(color="none",
-              size=guide_legend(title=paste0(type_rend))) +
+             size=guide_legend(title=paste0(type_rend))) +
       theme(aspect.ratio = 1,
             plot.title = element_text(size = 18, face = "bold"),
             axis.title = element_text(size = 16),
@@ -169,7 +180,7 @@ plot_indiv <- function(acpf, type_rend, var, axe, variable){
     
   }else if(length(axe) == 1){
     
-        scores |> 
+    scores |> 
       ggplot(aes(x = .data[[V[1]]], y = 0)) +
       geom_point(aes(color = exp, size = value)) +
       geom_hline(yintercept = 0, color = "grey68", linewidth = 0.6) +
@@ -215,10 +226,10 @@ fun_acpf("TEMP_T_Q", nbspines = 10)
 
 ```{r fun_acpf plot}
 fun_acpf_plot <- function(variable,
-                     centre = F, plot = T, nbspines = 30,
-                     nharm = 5,
-                     type_rend = "SY", var = "Aviso", axe = c(1, 2)){
-
+                          centre = F, plot = T, nbspines = 30,
+                          nharm = 5,
+                          type_rend = "SY", var = "Aviso", axe = c(1, 2)){
+  
   fdobj <- data_acp_f({{variable}}, centre = centre, plot = plot, nbspines = nbspines)  # crea data (spline)
   acpf <- pca.fd(fdobj, nharm = nharm)                 # pca fun
   
@@ -244,7 +255,7 @@ fun_acpf_plot("TEMP_T_Q", nbspines = 20, axe = c(1, 3), type_rend = "SY")
 ```
 
 
-```{r}
+```{r plot_fdobj_experience}
 plot_fdobj_experience <- function(fdobj, experience){
   
   saison <- c("AUTOMNE", "HIVER", "MONTAISON", "FLORAISON", "P300-P1000")
@@ -265,17 +276,17 @@ plot_fdobj_experience <- function(fdobj, experience){
        xaxt = "n")
   
   colours <- adjustcolor(
-  c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
-  alpha.f = 0.25)
+    c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+    alpha.f = 0.25)
   
   yl <- par("usr")[3:4]
-
+  
   rect(ref_lm_v[-length(ref_lm_v)],
-     yl[1],
-     ref_lm_v[-1],
-     yl[2],
-     col = colours,
-     border = NA)
+       yl[1],
+       ref_lm_v[-1],
+       yl[2],
+       col = colours,
+       border = NA)
   
   y_text <- yl + 0.05 * diff(yl)
   
@@ -288,17 +299,193 @@ plot_fdobj_experience <- function(fdobj, experience){
        xpd = TRUE)
   
   legend("topright", 
-       legend = experience,
-       col = cols,
-       lty = 1,
-       cex = 0.7,
-       bty = "n",
-       xpd = TRUE,
-       inset = c(-0.2, 0), 
-       seg.len = 1.5)
-
+         legend = experience,
+         col = cols,
+         lty = 1,
+         cex = 0.7,
+         bty = "n",
+         xpd = TRUE,
+         inset = c(-0.2, 0), 
+         seg.len = 1.5)
+  
 }
 
 plot_fdobj_experience(fdobj, c("INRA13", "INRA18", "INRA12", "BGA11","BGA15")) 
+```
+
+
+
+
+```{r plot_courbe}
+
+plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F, plot = T, nbspines = 30){
+  
+  if(variable == "TEMP_T_Q"){
+    ylab <- "Température moyenne quotidienne"
+  } else if (variable == "RAYO_SSI_Q"){
+    ylab <- "Rayonnement quotidienne"
+  } else if (variable == "E.HYD_WSC"){
+    ylab <- "Teneur en eau quotidienne"
+  }
+  
+  if(normaliser){
+    fdobj <- data_acp_f({{variable}}, centre = centre, plot = plot, nbspines = nbspines)
+    
+    if(!is.null(experience)){fdobj <- fdobj[experience]}
+    
+    saison <- c("AUTOMNE", "HIVER", "MONTAISON", "FLORAISON", "P300-P1000")
+    n <- length(experience)
+    cols <- viridis(n)
+    
+    par(mar = c(5, 4, 4, 8))
+    
+    plot(fdobj,
+         col = cols, 
+         lty = 1, 
+         xlab = "", 
+         ylab = ylab,
+         main = paste("Courbes fonctionnelles estimées :", expi), 
+         xaxt = "n")
+    
+    colours <- adjustcolor(
+      c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+      alpha.f = 0.25)
+    
+    yl <- par("usr")[3:4]
+    
+    rect(ref_lm_v[-length(ref_lm_v)],
+         yl[1],
+         ref_lm_v[-1],
+         yl[2],
+         col = colours,
+         border = NA)
+    
+    y_text <- yl + 0.05 * diff(yl)
+    
+    x_centers <- (ref_lm_v[-length(ref_lm_v)] + ref_lm_v[-1]) / 2  # centre des rectangles
+    y_label <- yl[1] - 0.1 * diff(yl)            # un peu en dessous
+    text(x = x_centers[1:length(saison)], 
+         y = y_label, 
+         labels = saison, 
+         cex = 0.9, 
+         xpd = TRUE)
+    
+    legend("topright", 
+           legend = experience,
+           col = cols,
+           lty = 1,
+           cex = 0.7,
+           bty = "n",
+           xpd = TRUE,
+           inset = c(-0.2, 0), 
+           seg.len = 1.5)
+  } else {
+    
+    dta <- meteo_brute |> 
+      select(exp, DATE_s, {{variable}}) |> 
+      filter(is.null(experience) | exp %in% experience) |>
+      mutate(DATE_s = as.numeric(as.Date(DATE_s)))
+    
+    if(is.null(experience)){experience <- unique(dta$exp)}
+    
+    for(expi in experience){
+      dta_i <- dta |> 
+        filter(exp == expi,
+               !is.na(DATE_s))
+      
+      rangeval <- c(min(dta_i$DATE_s), max(dta_i$DATE_s))
+      print(expi)
+      print(rangeval)
+      basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbspines)
+      
+      data_var <- dta_i |> 
+        pivot_wider(names_from = DATE_s, values_from = {{variable}}) |> 
+        column_to_rownames("exp") 
+      data_var <- as.matrix(data_var) 
+      
+      time <- as.numeric(colnames(data_var))
+      fdParobj <- fdPar(basisobj, lambda = 1e-3)
+      
+      fdsmooth <- smooth.basis(
+        argvals  = time,
+        y        = t(data_var),  # smooth.basis attend temps × individus
+        fdParobj = fdParobj
+      )
+      
+      
+      fdobj <- fdsmooth$fd
+      
+      if(plot){
+        
+        saison <- c("AUTOMNE", "HIVER", "MONTAISON", "FLORAISON", "P300-P1000")
+        n <- length(exp)
+        cols <- viridis(n)
+        
+        par(mar = c(5, 4, 4, 8))
+        
+        plot(fdobj,
+             lty = 1, 
+             xlab = "", 
+             ylab = ylab,
+             main = paste("Courbes fonctionnelles estimées :", expi), 
+             xaxt = "n"
+             )
+        
+        colours <- adjustcolor(
+          c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+          alpha.f = 0.25)
+        
+        yl <- par("usr")[3:4]
+        
+        
+        lm_v <- lm |> 
+          filter(PARTENAIRE == "INRA11") |> 
+          select(DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s ) |> 
+          as.vector() |> 
+          unlist() |> 
+          as.Date() |> 
+          as.numeric()
+        
+        rect(lm_v[-length(lm_v)],
+             yl[1],
+             lm_v[-1],
+             yl[2],
+             col = colours,
+             border = NA)
+        
+        y_text <- yl + 0.05 * diff(yl)
+        
+        x_centers <- (lm_v[-length(lm_v)] + lm_v[-1]) / 2  # centre des rectangles
+        y_label <- yl[1] - 0.1 * diff(yl)            # un peu en dessous
+        text(x = x_centers[1:length(saison)], 
+             y = y_label, 
+             labels = saison, 
+             cex = 0.9, 
+             xpd = TRUE)
+        
+        legend("topright", 
+               legend = exp,
+               col = cols,
+               lty = 1,
+               cex = 0.7,
+               bty = "n",
+               xpd = TRUE,
+               inset = c(-0.2, 0), 
+               seg.len = 1.5)
+        
+        
+      }
+      # save.image(paste0("image/", variable, "_", expi, ".png"))
+    }
+    
+  }
+  
+}
+
+plot_courbe("RAYO_SSI_Q", normaliser = F)
+
+
+
+
 ```
 
