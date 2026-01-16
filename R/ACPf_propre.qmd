@@ -389,6 +389,12 @@ plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F,
     if(is.null(experience)){experience <- unique(dta$exp)}
     
     for(expi in experience){
+      print("a")
+      png(filename = paste0("image/", variable, "_", expi, ".png"),
+      width = 800, height = 600, res = 120)
+      print("c")
+      
+      
       dta_i <- dta |> 
         filter(exp == expi,
                !is.na(DATE_s))
@@ -415,6 +421,7 @@ plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F,
       
       fdobj <- fdsmooth$fd
       
+      print("d")
       if(plot){
         
         saison <- c("AUTOMNE", "HIVER", "MONTAISON", "FLORAISON", "P300-P1000")
@@ -437,6 +444,7 @@ plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F,
         
         yl <- par("usr")[3:4]
         
+        print("e")
         
         lm_v <- lm |> 
           filter(PARTENAIRE == "INRA11") |> 
@@ -472,10 +480,11 @@ plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F,
                xpd = TRUE,
                inset = c(-0.2, 0), 
                seg.len = 1.5)
-        
+        print("f")
         
       }
-      # save.image(paste0("image/", variable, "_", expi, ".png"))
+      print("b")
+      dev.off()
     }
     
   }
