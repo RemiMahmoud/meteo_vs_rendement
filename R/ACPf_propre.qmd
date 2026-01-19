@@ -7,6 +7,8 @@ format: html
 library(tidyverse)
 library(fda)
 library(viridis)
+conflicted::conflicts_prefer(dplyr::filter, dplyr::select)
+
 ```
 
 
@@ -100,6 +102,9 @@ fdobj <- data_acp_f(E.HYD_WSC, centre = F, plot = T)
 ```{r plot_harmonique}
 
 plot_harmonique <- function(acpf, i, variable){
+  # png(filename = paste0("image/PC", i, "_", variable, ".png"),
+  #     width = 1800, height = 900, res = 180)
+  
   fd_eval <- eval.fd(seq(11219, 11502, length.out = 100), acpf$harmonics[i])
   
   ylim <- range(fd_eval)
@@ -132,8 +137,13 @@ plot_harmonique <- function(acpf, i, variable){
        labels = saison, 
        cex = 0.9, 
        xpd = TRUE)
+  # dev.off()
   
 }
+
+fdobj <- data_acp_f(RAYO_SSI_Q, centre = F, plot = F)
+acpf <- pca.fd(fdobj, nharm = 5)
+plot_harmonique(acpf, 1, "RAYO_SSI_Q")
 
 #plot_harmonique(acpf, 1)  #humidité moyenne
 #plot_harmonique(acpf, 2)  #sec fin
