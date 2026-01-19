@@ -107,7 +107,7 @@ plot_harmonique <- function(acpf, i, variable){
   saison <- c("AUTOMNE", "HIVER", "MONTAISON", "FLORAISON", "P300-P1000")
   
   plot(acpf$harmonics[i],
-       main = paste(num[i], "composante principale fonctionnelle"),
+       main = paste(num[i], "composante principale fonctionnelle de ", variable),
        xlab = "",
        xaxt = "n",
        ylab = paste("Valeur de la", num[i], "composante principale"))
@@ -157,19 +157,24 @@ plot_indiv <- function(acpf, type_rend, var, axe, variable){
   
   if(length(axe) == 2){
     
+    borne <- max(
+      abs(scores[[V[1]]]),
+      abs(scores[[V[2]]])
+    ) * 1.1
+    
     scores |> 
       ggplot(aes(x = .data[[V[1]]], y = .data[[V[2]]])) +
       geom_point(aes(color = exp, size = value)) +
       geom_hline(yintercept = 0, color = "grey68", linewidth = 0.6) + 
       geom_vline(xintercept = 0, color = "grey68", linewidth = 0.6) +
       geom_text(aes(label = exp), vjust = -1) +
+      coord_fixed(ratio = 1) +
+      scale_x_continuous(limits = c(-borne, borne)) +
+      scale_y_continuous(limits = c(-borne, borne)) +
       theme_minimal() +
-      scale_x_continuous(limits = c(-1000, 1000),breaks = seq(-1000, 1000, by = 200)) +
-      scale_y_continuous(limits = c(-1000, 1000),breaks = seq(-1000, 1000, by = 200)) +
       guides(color="none",
              size=guide_legend(title=paste0(type_rend))) +
-      theme(aspect.ratio = 1,
-            plot.title = element_text(size = 18, face = "bold"),
+      theme(plot.title = element_text(size = 18, face = "bold"),
             axis.title = element_text(size = 16),
             axis.text  = element_text(size = 14),
             legend.title = element_text(size = 13),
@@ -203,7 +208,7 @@ plot_indiv <- function(acpf, type_rend, var, axe, variable){
   }
 }
 
-fdobj <- data_acp_f(E.HYD_WSC, centre = F, plot = T)
+fdobj <- data_acp_f(TEMP_T_Q, centre = F, plot = T)
 acpf <- pca.fd(fdobj, nharm = 5) 
 plot_indiv(acpf,type_rend = "SY", var = "Montego", axe = c(1, 2), "E.HYD_WSC" )
 
@@ -239,11 +244,11 @@ fun_acpf_plot <- function(variable,
   # plot fonction moyenne
   plot(mean.fd(fdobj))
   
-  plot_harmonique(acpf, 1)
-  plot_harmonique(acpf, 2)
-  plot_harmonique(acpf, 3)
-  plot_harmonique(acpf, 4)
-  plot_harmonique(acpf, 5)
+  plot_harmonique(acpf, 1, variable)
+  plot_harmonique(acpf, 2, variable)
+  plot_harmonique(acpf, 3, variable)
+  plot_harmonique(acpf, 4, variable)
+  plot_harmonique(acpf, 5, variable)
   
   plot_indiv(acpf, type_rend = type_rend, var = var, axe = axe, variable={{variable}} ) 
   
@@ -263,7 +268,7 @@ plot_fdobj_experience <- function(fdobj, experience){
   fd_subset <- fdobj[experience]
   
   n <- length(experience)
-  cols <- viridis(n)
+  cols <- c("red", "black", "blue")
   
   par(mar = c(5, 4, 4, 8))
   
@@ -291,7 +296,7 @@ plot_fdobj_experience <- function(fdobj, experience){
   y_text <- yl + 0.05 * diff(yl)
   
   x_centers <- (ref_lm_v[-length(ref_lm_v)] + ref_lm_v[-1]) / 2  # centre des rectangles
-  y_label <- yl - 0.1 * diff(yl)            # un peu en dessous
+  y_label <- yl[1] - 0.1 * diff(yl) * c(1, 1.5)   # un peu en dessous
   text(x = x_centers[1:length(saison)], 
        y = y_label, 
        labels = saison, 
@@ -302,7 +307,7 @@ plot_fdobj_experience <- function(fdobj, experience){
          legend = experience,
          col = cols,
          lty = 1,
-         cex = 0.7,
+         cex = 1,
          bty = "n",
          xpd = TRUE,
          inset = c(-0.2, 0), 
@@ -310,7 +315,7 @@ plot_fdobj_experience <- function(fdobj, experience){
   
 }
 
-plot_fdobj_experience(fdobj, c("INRA13", "INRA18", "INRA12", "BGA11","BGA15")) 
+plot_fdobj_experience(fdobj, c("INRA13", "SYN14", "LIM15")) 
 ```
 
 
@@ -318,7 +323,7 @@ plot_fdobj_experience(fdobj, c("INRA13", "INRA18", "INRA12", "BGA11","BGA15"))
 
 ```{r plot_courbe}
 
-plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F, plot = T, nbspines = 30){
+plot_courbe <- function(variable, brute = F, normaliser = F, experience = NULL, centre = F, plot = T, nbspines = 30){
   
   if(variable == "TEMP_T_Q"){
     ylab <- "Température moyenne quotidienne"
@@ -389,19 +394,14 @@ plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F,
     if(is.null(experience)){experience <- unique(dta$exp)}
     
     for(expi in experience){
-      print("a")
-      png(filename = paste0("image/", variable, "_", expi, ".png"),
-      width = 1800, height = 900, res = 180)
-      print("c")
-      
+      # png(filename = paste0("image/", variable, "_", expi, "_brute.png"), 
+      #     width = 1800, height = 900, res = 180)
       
       dta_i <- dta |> 
         filter(exp == expi,
                !is.na(DATE_s))
       
       rangeval <- c(min(dta_i$DATE_s), max(dta_i$DATE_s))
-      print(expi)
-      print(rangeval)
       basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbspines)
       
       data_var <- dta_i |> 
@@ -421,7 +421,6 @@ plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F,
       
       fdobj <- fdsmooth$fd
       
-      print("d")
       if(plot){
         
         saison <- c("AUTOMNE", "HIVER", "MONTAISON", "FLORAISON", "P300-P1000")
@@ -429,14 +428,26 @@ plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F,
         cols <- viridis(n)
         
         par(mar = c(5, 4, 4, 8))
-        
-        plot(fdobj,
+        if(brute){
+          plot(time, data_var,  ##################  fdobj
+             lty = 1, 
+             type = "l",
+             xlab = "", 
+             ylab = ylab,
+             main = paste("Courbes fonctionnelles estimées :", expi), 
+             xaxt = "n"
+        )
+        } else {
+          plot(fdobj,
              lty = 1, 
              xlab = "", 
              ylab = ylab,
              main = paste("Courbes fonctionnelles estimées :", expi), 
              xaxt = "n"
-             )
+        )
+        }
+        
+
         
         colours <- adjustcolor(
           c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
@@ -444,7 +455,6 @@ plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F,
         
         yl <- par("usr")[3:4]
         
-        print("e")
         lm_v <- lm |> 
           filter(PARTENAIRE == expi) |> 
           select(DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s ) |> 
@@ -460,7 +470,7 @@ plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F,
              col = colours,
              border = NA)
         
-
+        
         x_centers <- (lm_v[-length(lm_v)] + lm_v[-1]) / 2  # centre des rectangles
         y_label <- yl[1] - 0.1 * diff(yl) * c(1, 1.5)           # un peu en dessous
         text(x = x_centers[1:length(saison)], 
@@ -468,31 +478,23 @@ plot_courbe <- function(variable, normaliser = T, experience = NULL, centre = F,
              labels = saison, 
              cex = 0.9, 
              xpd = TRUE)
-        
-        # legend("topright", 
-        #        legend = exp,
-        #        col = cols,
-        #        lty = 1,
-        #        cex = 0.7,
-        #        bty = "n",
-        #        xpd = TRUE,
-        #        inset = c(-0.2, 0), 
-        #        seg.len = 1.5)
-        print("f")
-        
+
+
       }
-      print("b")
-      dev.off()
+      
+      # dev.off()
     }
     
   }
   
 }
 
-plot_courbe("E.HYD_WSC", normaliser = F)
+plot_courbe("E.HYD_WSC", brute = T)
 
 
 
 
 ```
+
+
 
