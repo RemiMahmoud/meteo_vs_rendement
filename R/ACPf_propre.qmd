@@ -264,7 +264,7 @@ fun_acpf_plot <- function(variable,
   
 }
 
-fun_acpf_plot("TEMP_T_Q", nbspines = 20, axe = c(1, 3), type_rend = "SY")
+fun_acpf_plot("TEMP_T_Q", nbspines = 10, axe = c(1, 3), type_rend = "SY")
 
 
 ```
