@@ -132,7 +132,7 @@ landmarks |>
   labs(
     x = "Landmarks",
     y = "Date",
-    title = "Variation de la durée des stades phénologiques de la plante en fonction de l'expérience",
+    title = "Variation de la durée des stades phénologiques\n de la plante en fonction de l'expérience",
     colour = "Expérience") +
   theme(plot.title = element_text(size = 20),
         axis.title.x = element_text(size = 20),
@@ -161,7 +161,7 @@ landmarks |>
   labs(
     x = "Landmarks",
     y = "Date",
-    title = "Variation de la durée des stades phénologiques de la plante en fonction de l'expérience",
+    title = "Variation de la durée des stades phénologiques\n de la plante en fonction de l'expérience",
     colour = "Expérience") +
   theme(plot.title = element_text(size = 20),
         axis.title.x = element_text(size = 20),
