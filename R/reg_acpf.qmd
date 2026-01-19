@@ -1,0 +1,129 @@
+---
+title: "reg_acpf"
+format: html
+---
+
+```{r library}
+
+library(tidyverse)
+library(FactoMineR)
+
+
+```
+
+
+```{r data}
+meteo_lm <- read.csv("data/meteo_lm")
+summary(meteo_lm)
+glimpse(meteo_lm)
+
+rendement <- read.csv("data/rendement.csv") |>
+  select(-X) |> 
+  filter(type == "SY",
+         !is.na(value)) |>
+  mutate(variety = sub("^[^_]*_[^_]*_", "", variety)) |> 
+  select(exp, type, value, variety)
+
+info <- read.csv("data/dt_anova") |> 
+  rename(exp = PARTENAIRE) |> 
+  select(exp, Year, Latitude, Longitude, AN, ADB, NNI, Ntotal, WSC_MAX, WSC_I, DBI, DAI, RO, RF)
+
+landmark <- read.csv("data/landmarks.csv") |> 
+  rename(exp = PARTENAIRE) |> 
+  select(exp, DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P) # attention à duree flo
+
+dta <- rendement |> 
+  left_join(info) |> 
+  left_join(landmark) |> 
+  arrange(match(exp, noms)) |> 
+  filter(!is.na(Year)) |> 
+  mutate(variety = as.factor(variety),
+         Year = as.factor(Year))
+
+rm(rendement, info, landmark)
+
+```
+
+
+```{r noms}
+noms <- c("INRA11","BGA11",
+          "INRA12",
+          "INRA13","TI13",
+          "EUR14","SYN14","MAD14","RAGT14",
+          "TI15","LIM15","SYN15","INRA15","BGA15","RAGT15","MAD15",
+          "INRA16",
+          "INRA17",
+          "INRA18","EUR18")
+```
+
+
+```{r fonction crea data pour acp f}
+
+data_acp_f <- function(var, centre = F, plot = T, nbspines = 30){
+  rangeval <- c(min(meteo_lm$date_ref), max(meteo_lm$date_ref)) # définition de l'échelle (les longueurs d'ondes)
+  nbasis <- nbspines # Nombre de splines utilisées
+  basisobj <- create.bspline.basis(rangeval = rangeval, nbasis = nbasis) # création d'une base d'objet
+  
+  
+  data_var <- meteo_lm |> 
+    dplyr::select(exp, date_ref, {{var}}) |> 
+    mutate(date_ref = as.numeric(date_ref)) |> 
+    pivot_wider(names_from = date_ref, values_from = {{var}}) |> 
+    column_to_rownames("exp") 
+  
+  
+  ##### si on veut faire une acp et non une svd 
+  if(centre){
+    m <- apply(data_var, 1, mean)
+    s <- apply(data_var - m, 1, sd)
+    
+    data_var <- (data_var - m) / s |> 
+      as.matrix() 
+  }
+  
+  data_var <- as.matrix(data_var) 
+  
+  time <- as.numeric(colnames(data_var))
+  fdParobj <- fdPar(basisobj, lambda = 1e-3)
+  
+  fdsmooth <- smooth.basis(
+    argvals  = time,
+    y        = t(data_var),  # smooth.basis attend temps × individus
+    fdParobj = fdParobj
+  )
+  
+  
+  fdobj <- fdsmooth$fd
+  
+  if(plot){plot(fdobj)}
+  
+  return(fdobj)
+}
+
+```
+
+```{r}
+
+
+acpf_HYD <- pca.fd(data_acp_f(E.HYD_WSC, centre = F, plot = F), nharm = 5)
+acpf_TEMP <- pca.fd(data_acp_f(TEMP_T_Q, centre = F, plot = F), nharm = 5)
+acpf_RAYO <- pca.fd(data_acp_f(RAYO_SSI_Q, centre = F, plot = F), nharm = 5)
+colnames(acpf_HYD$scores) <- c("PC1_HYD", "PC2_HYD", "PC3_HYD", "PC4_HYD" ,"PC5_HYD")
+colnames(acpf_TEMP$scores) <- c("PC1_TEMP", "PC2_TEMP", "PC3_TEMP", "PC4_TEMP" ,"PC5_TEMP")
+colnames(acpf_RAYO$scores) <- c("PC1_RAYO", "PC2_RAYO", "PC3_RAYO", "PC4_RAYO" ,"PC5_RAYO")
+
+dta <- dta |> 
+  left_join(acpf_HYD$scores |> cbind(data.frame(exp = noms))) |>
+  left_join(acpf_TEMP$scores |> cbind(data.frame(exp = noms)))|> 
+  left_join(acpf_RAYO$scores |> cbind(data.frame(exp = noms)))
+
+
+
+
+
+
+```
+
+
+
+
