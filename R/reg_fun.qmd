@@ -35,7 +35,8 @@ rendement <- read.csv("data/rendement.csv") |>
   select(-X) |> 
   filter(type == "SY",
          !is.na(value)) |>
-  mutate(variety = sub("^[^_]*_[^_]*_", "", variety))
+  mutate(variety = sub("^[^_]*_[^_]*_", "", variety)) |> 
+  select(exp, type, value, variety)
 
 dt_meteo <- read.csv("data/meteo_lm") |> 
   select(date_ref, exp, TEMP_T_Q, E.HYD_WSC, RAYO_Cumul_RG) |> 
@@ -51,7 +52,6 @@ landmark <- read.csv("data/landmarks.csv") |>
   select(exp, DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P) # attention à duree flo
 
 dta <- rendement |> 
-  select(exp, type, value, variety) |> 
   left_join(info) |> 
   left_join(landmark) |> 
   left_join(dt_meteo) |> 
