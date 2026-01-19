@@ -114,27 +114,55 @@ A mettre dans l'ordre des saisons
 ```{r}
 
 
-landmarks |> 
-  dplyr::select(YEAR, ENVIRONNEMENT, DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |> 
-  pivot_longer(c(DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s),
-               names_to = "type_date",
-               values_to = "value") |>  
-  mutate(
-    type_date = factor(type_date, 
-                       levels = c("DEBUT_EXP_s", "DEBUT_CW_s", "FIN_CW_s",
-                                  "DEBUT_FLO_s", "FIN_FLO_s", "FIN_EXP_s")))|>
-  
+landmarks |>
+  dplyr::select(YEAR, PARTENAIRE,
+                DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s,
+                DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |>
+  pivot_longer(c(DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s,
+                 DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s),
+               names_to = "type_date", values_to = "value") |>
+  mutate(type_date = factor(type_date,
+                            levels = c("DEBUT_EXP_s", "DEBUT_CW_s", "FIN_CW_s",
+                                       "DEBUT_FLO_s", "FIN_FLO_s", "FIN_EXP_s")))|>
   ggplot(aes(x = type_date, y = value)) +
-  geom_boxplot(outlier.shape = NA) +      
-  geom_point(aes(colour = ENVIRONNEMENT), alpha = 0.6) + 
-  geom_line(
-    aes(group = ENVIRONNEMENT, colour = ENVIRONNEMENT), alpha = 0.6
-  ) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(aes(colour = PARTENAIRE), alpha = 0.6) +
+  geom_line( aes(group = PARTENAIRE, colour = PARTENAIRE), alpha = 0.6 ) +
   theme_minimal() +
   labs(
-    x = "moments clées",
-    y = "date d'apparition",
-    title = "Apparition des différents moments clées pour la plantes en fonction de l'expérience") +
+    x = "Landmarks",
+    y = "Date",
+    title = "Variation de la durée des stades phénologiques de la plante en fonction de l'expérience",
+    colour = "Expérience") +
+  theme(plot.title = element_text(size = 20),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20))
+
+```
+
+
+```{r}
+landmarks |>
+  dplyr::select(YEAR, PARTENAIRE,
+                DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s,
+                DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |>
+  pivot_longer(c(DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s,
+                 DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s),
+               names_to = "type_date", values_to = "value") |>
+  mutate(type_date = factor(type_date,
+                            levels = c("DEBUT_EXP_s", "DEBUT_CW_s", "FIN_CW_s",
+                                       "DEBUT_FLO_s", "FIN_FLO_s", "FIN_EXP_s")))|>
+  filter(PARTENAIRE %in% c("INRA13", "LIM15", "SYN14")) |> 
+  ggplot(aes(x = type_date, y = value)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(aes(colour = PARTENAIRE), alpha = 0.6) +
+  geom_line( aes(group = PARTENAIRE, colour = PARTENAIRE), alpha = 0.6 ) +
+  theme_minimal() +
+  labs(
+    x = "Landmarks",
+    y = "Date",
+    title = "Variation de la durée des stades phénologiques de la plante en fonction de l'expérience",
+    colour = "Expérience") +
   theme(plot.title = element_text(size = 20),
         axis.title.x = element_text(size = 20),
         axis.title.y = element_text(size = 20))
