@@ -7,8 +7,23 @@ format: html
 
 library(tidyverse)
 library(FactoMineR)
+library(Factoshiny)
+library(pls)
+library(fda)
 
 
+```
+
+
+```{r noms}
+noms <- c("INRA11","BGA11",
+          "INRA12",
+          "INRA13","TI13",
+          "EUR14","SYN14","MAD14","RAGT14",
+          "TI15","LIM15","SYN15","INRA15","BGA15","RAGT15","MAD15",
+          "INRA16",
+          "INRA17",
+          "INRA18","EUR18")
 ```
 
 
@@ -42,18 +57,6 @@ dta <- rendement |>
 
 rm(rendement, info, landmark)
 
-```
-
-
-```{r noms}
-noms <- c("INRA11","BGA11",
-          "INRA12",
-          "INRA13","TI13",
-          "EUR14","SYN14","MAD14","RAGT14",
-          "TI15","LIM15","SYN15","INRA15","BGA15","RAGT15","MAD15",
-          "INRA16",
-          "INRA17",
-          "INRA18","EUR18")
 ```
 
 
@@ -105,9 +108,9 @@ data_acp_f <- function(var, centre = F, plot = T, nbspines = 30){
 ```{r}
 
 
-acpf_HYD <- pca.fd(data_acp_f(E.HYD_WSC, centre = F, plot = F), nharm = 5)
-acpf_TEMP <- pca.fd(data_acp_f(TEMP_T_Q, centre = F, plot = F), nharm = 5)
-acpf_RAYO <- pca.fd(data_acp_f(RAYO_SSI_Q, centre = F, plot = F), nharm = 5)
+acpf_HYD <- pca.fd(data_acp_f(E.HYD_WSC, centre = T, plot = F, nbspines = 10), nharm = 5)
+acpf_TEMP <- pca.fd(data_acp_f(TEMP_T_Q, centre = T, plot = F, nbspines = 10), nharm = 5)
+acpf_RAYO <- pca.fd(data_acp_f(RAYO_SSI_Q, centre = T, plot = F, nbspines = 10), nharm = 5)
 colnames(acpf_HYD$scores) <- c("PC1_HYD", "PC2_HYD", "PC3_HYD", "PC4_HYD" ,"PC5_HYD")
 colnames(acpf_TEMP$scores) <- c("PC1_TEMP", "PC2_TEMP", "PC3_TEMP", "PC4_TEMP" ,"PC5_TEMP")
 colnames(acpf_RAYO$scores) <- c("PC1_RAYO", "PC2_RAYO", "PC3_RAYO", "PC4_RAYO" ,"PC5_RAYO")
@@ -115,8 +118,9 @@ colnames(acpf_RAYO$scores) <- c("PC1_RAYO", "PC2_RAYO", "PC3_RAYO", "PC4_RAYO" ,
 dta <- dta |> 
   left_join(acpf_HYD$scores |> cbind(data.frame(exp = noms))) |>
   left_join(acpf_TEMP$scores |> cbind(data.frame(exp = noms)))|> 
-  left_join(acpf_RAYO$scores |> cbind(data.frame(exp = noms)))
+  left_join(acpf_RAYO$scores |> cbind(data.frame(exp = noms))) 
 
+summary(dta)
 
 
 
@@ -124,6 +128,52 @@ dta <- dta |>
 
 ```
 
+
+
+```{r}
+
+# Factoshiny(dta)
+
+dta <- dta |> 
+  select(-DUREE_FLO)
+
+mod <- plsr(
+  value ~ .,
+  data = dta[, c(3, 6:36)],
+  scale = TRUE,
+  validation = "LOO",   # robuste avec petit n
+  ncomp = 20            # max raisonnable
+)
+
+rmsep_mod <- RMSEP(mod)
+plot(rmsep_mod, legendpos = "topright")
+
+rmsep <- rmsep_mod$val["CV", , -1]  # enlève l'intercept
+opt_ncomp <- which.min(rmsep)
+
+opt_ncomp
+
+min(rmsep)
+
+rmsep[10]
+
+coef_pls <- coef(mod, ncomp = 10)
+
+coef_df <- data.frame(
+  variable = rownames(coef_pls),
+  coefficient = as.vector(coef_pls)
+)
+
+ggplot(coef_df, aes(x = reorder(variable, coefficient), y = coefficient)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = paste("Coefficients PLS (10 composantes)", sep=""),
+       x = "Variable",
+       y = "Coefficient") +
+  theme_classic()
+
+
+```
 
 
 
