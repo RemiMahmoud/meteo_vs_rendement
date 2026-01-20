@@ -5,7 +5,7 @@ format: html
 
 
 Librairies
-```{r}
+```{r Librairies}
 library(tidyverse)
 library(readxl)
 library(lubridate)
@@ -14,7 +14,7 @@ library(factoextra)
 ```
 
 
-```{r}
+```{r noms}
 noms <- c("INRA11","BGA11",
           "INRA12",
           "INRA13","TI13",
@@ -28,7 +28,7 @@ noms <- c("INRA11","BGA11",
 
 # lecture landmarks
 
-```{r}
+```{r landmarks}
 
 
 landmarks <- read_excel("data/Date_landmark.xlsx")  |>
@@ -77,9 +77,9 @@ landmarks <- read_excel("data/Date_landmark.xlsx")  |>
     FIN_EXP_s = as.Date(sprintf("%04d-%02d-%02d", fake_year_fe, m_fe, d_fe)),
   ) |> 
   dplyr::select(PARTENAIRE, ENVIRONNEMENT, YEAR,
-         DEBUT_EXP, DEBUT_CW, FIN_CW, DEBUT_FLO, FIN_FLO, FIN_EXP,
-         DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P,
-         DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |> 
+                DEBUT_EXP, DEBUT_CW, FIN_CW, DEBUT_FLO, FIN_FLO, FIN_EXP,
+                DUREE_AU, DUREE_CW, DUREE_BO, DUREE_FLO, DUREE_P,
+                DEBUT_EXP_s, DEBUT_CW_s, FIN_CW_s, DEBUT_FLO_s, FIN_FLO_s, FIN_EXP_s) |> 
   mutate(ZERO = 0, INF = 20000)
 
 # write.csv(landmarks, "C:/Users/louis/OneDrive/Bureau/Cours/M2/meteo_vs_rendement/data/landmarks.csv")
@@ -425,7 +425,7 @@ graph_RAYO <- dt_meteo  |>
   )
 
 graph_RAYO_cumul <- dt_meteo  |> 
- # filter(exp == "INRA18") |> 
+  # filter(exp == "INRA18") |> 
   ggplot(aes(x = DATE_s, y = RAYO_Cumul, color = exp, group = exp)) +
   geom_line() +
   theme_minimal() +
@@ -574,14 +574,55 @@ for (name in names(dts)){
   
   dts_lm_l[[name]] <- dt
   
+  ref_lm_v <- ref_lm[2:7]
+  lm_i <- landmarks_s[[name]][2:7]
   
-  plot(date, new_date, type = "l")  # traits entre les points
-  title(name)
+  #png(paste0("image/bij/bij_", name,".png"), width = 6, height = 6, units = "in", res = 300)
+  
+  plot(date, new_date,
+       type = "l",
+       asp = 1,
+       xaxt = "n", yaxt = "n",
+       xlab = "Dates de référence", 
+       ylab = "Dates réélles",
+       main = name)  
+  
+  axis(1,
+       at = ref_lm[2:7],
+       labels = format(as.Date(ref_lm[2:7]), format = "%d-%m"),
+       las = 2)
+  axis(2,
+       at = lm_i,
+       labels = format(as.Date(as.numeric(lm_i)), format = "%d-%m"),
+       las = 2)
+  
+  cols <- adjustcolor(
+    c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+    alpha.f = 0.25)
+  
+
+
+  rect(ref_lm_v[-length(ref_lm_v)],  # xleft
+       lm_i[1],                # ybottom
+       ref_lm_v[-1],               # xright
+       lm_i[-1],                # ytop
+       col = cols,
+       border = NA)
+  rect(ref_lm_v[1],  # xleft
+       lm_i[-length(lm_i)],                # ybottom
+       ref_lm_v[-1],               # xright
+       lm_i[-1],                # ytop
+       col = cols,
+       border = NA)
+  
   points(ref_lm[2:7],
-         landmarks_s[[name]][2:7],
-         col = "red",
+         lm_i,
+         col = "black",
          pch = 16,
-         cex = 2)
+         cex = 2,
+  )
+  
+  #dev.off()
   
 }
 
