@@ -501,9 +501,6 @@ plot_courbe <- function(variable, brute = F, normaliser = F, experience = NULL, 
 
 plot_courbe("E.HYD_WSC", brute = T)
 
-
-
-
 ```
 
 
