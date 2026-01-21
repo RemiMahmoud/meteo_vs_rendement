@@ -405,7 +405,7 @@ plot_courbe <- function(variable, brute = F, normaliser = F, experience = NULL, 
     
     for(expi in experience){
       # png(filename = paste0("image/", variable, "_", expi, "_brute.png"), 
-      #     width = 1800, height = 900, res = 180)
+      # width = 1800, height = 900, res = 180)
       
       dta_i <- dta |> 
         filter(exp == expi,
@@ -440,24 +440,24 @@ plot_courbe <- function(variable, brute = F, normaliser = F, experience = NULL, 
         par(mar = c(5, 4, 4, 8))
         if(brute){
           plot(time, data_var,  ##################  fdobj
-             lty = 1, 
-             type = "l",
-             xlab = "", 
-             ylab = ylab,
-             main = paste("Courbes fonctionnelles estimées :", expi), 
-             xaxt = "n"
-        )
+               lty = 1, 
+               type = "l",
+               xlab = "", 
+               ylab = ylab,
+               main = paste("Courbes fonctionnelles estimées :", expi), 
+               xaxt = "n"
+          )
         } else {
           plot(fdobj,
-             lty = 1, 
-             xlab = "", 
-             ylab = ylab,
-             main = paste("Courbes fonctionnelles estimées :", expi), 
-             xaxt = "n"
-        )
+               lty = 1, 
+               xlab = "", 
+               ylab = ylab,
+               main = paste("Courbes fonctionnelles estimées :", expi), 
+               xaxt = "n"
+          )
         }
         
-
+        
         
         colours <- adjustcolor(
           c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
@@ -472,6 +472,12 @@ plot_courbe <- function(variable, brute = F, normaliser = F, experience = NULL, 
           unlist() |> 
           as.Date() |> 
           as.numeric()
+        
+        
+        axis(1, at = lm_v,
+             labels = format(as.Date(lm_v), format = "%d-%m"),
+             padj = -1,
+             col.axis = "grey50")
         
         rect(lm_v[-length(lm_v)],
              yl[1],
@@ -488,8 +494,8 @@ plot_courbe <- function(variable, brute = F, normaliser = F, experience = NULL, 
              labels = saison, 
              cex = 0.9, 
              xpd = TRUE)
-
-
+        
+        
       }
       
       # dev.off()

@@ -556,7 +556,6 @@ names(dts_lm_l) <- noms
 
 
 for (name in names(dts)){
-  
   l_s <- landmarks_s[[name]] |> as.numeric()
   sp <- splines_l[[name]]
   
@@ -574,8 +573,17 @@ for (name in names(dts)){
   
   dts_lm_l[[name]] <- dt
   
+  
+  
+  
+  # plot bij
+  
+  
+  
   ref_lm_v <- ref_lm[2:7]
   lm_i <- landmarks_s[[name]][2:7]
+  
+  ##### PLOT ####
   
   #png(paste0("image/bij/bij_", name,".png"), width = 6, height = 6, units = "in", res = 300)
   
@@ -584,7 +592,7 @@ for (name in names(dts)){
        asp = 1,
        xaxt = "n", yaxt = "n",
        xlab = "Dates de référence", 
-       ylab = "Dates réélles",
+       ylab = "Dates réelles",
        main = name)  
   
   axis(1,
@@ -600,8 +608,8 @@ for (name in names(dts)){
     c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
     alpha.f = 0.25)
   
-
-
+  
+  
   rect(ref_lm_v[-length(ref_lm_v)],  # xleft
        lm_i[1],                # ybottom
        ref_lm_v[-1],               # xright
@@ -633,22 +641,21 @@ dts_lm <- imap_dfr(dts_lm_l, ~ mutate(exp = .y, .x)) |>
 
 summary(dts_lm)
 
-dts_lm$exp[which(is.na(dts_lm$DATE))]
-# problème avec INRA11 et SYN15
+
 
 ```
+
 
 #fixe RAYO cumul RG
 ```{r}
 
-dt_meteo <- dt_meteo |> 
+dt_meteo2 <- dt_meteo |> 
   group_by(exp) |> 
   arrange(exp, DATE) |>    # important pour l’ordre du cumul
   mutate(RAYO_Cumul = cumsum(RAYO_SSI_Q)) |> 
   ungroup()
 
 ```
-
 
 
 #plot meteo et landmark avec et sans transformation
@@ -666,7 +673,7 @@ land_long <- landmarks |>
 
 #graph_TEMP_T_Q <- 
 
-dt_meteo  |> 
+dt_meteo2  |> 
   head(600) |> 
   mutate(
     m = month(DATE),
@@ -695,5 +702,141 @@ dt_meteo  |>
 ```
 
 
+```{r  plot dt_brute}
 
+
+expi <- "SYN14"
+
+# png(paste0("image/bij/HYD_reel_", expi,".png"), width = 6, height = 4, units = "in", res = 300)
+
+
+dt_brute <- read.csv("data/meteo_brute.csv")
+lm_i <- as.numeric(landmarks_s[[expi]][2:7])
+
+dt_var <- dt_meteo |> 
+  filter(exp == expi) |> 
+  select(DATE_s, E.HYD_WSC) |> 
+  mutate(DATE_s = as.Date(DATE_s),
+         DATE_s_n = as.numeric(DATE_s)) |> 
+  filter(as.numeric(as.Date(DATE_s)) %in% lm_i[1]:lm_i[6])
+
+plot(dt_var$DATE_s, dt_var$E.HYD_WSC,
+     type = "l",
+     xaxt = "n",
+     xlab = "Dates réelles", 
+     ylab = "Water soil content",
+     main = paste0(expi, " - référentiel réel"))
+
+yl <- par("usr")[3:4]
+
+axis(1, at = lm_i,
+     labels = format(as.Date(lm_i), format = "%d-%m"),
+     las = 2)
+
+cols <- adjustcolor(
+  c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+  alpha.f = 0.25)
+
+rect(lm_i[-length(lm_i)],
+     yl[1],
+     lm_i[-1],
+     yl[2],
+     col = cols,
+     border = NA)
+
+x_ref <- seq(lm_i[1], lm_i[6], by = 10)
+points(x_ref, numeric(length(x_ref)))
+
+# dev.off()
+
+
+```
+
+
+```{r plot dt brute bij}
+
+
+# png(paste0("image/bij/HYD_ref_", expi,".png"), width = 6, height = 4, units = "in", res = 300)
+
+dt_var_bij <- dts_lm |> 
+  filter(exp == expi) |> 
+  select(date_ref, E.HYD_WSC) |> 
+  mutate(date_ref_d = as.Date(date_ref)) |> 
+  filter(date_ref %in% ref_lm_v[1]:ref_lm_v[6])
+
+plot(dt_var_bij$date_ref_d, dt_var_bij$E.HYD_WSC,
+     type = "l",
+     xaxt = "n",
+     xlab = "Dates de référence", 
+     ylab = "Water soil content",
+     main = paste0(expi, " - référentiel plante"))
+
+yl <- par("usr")[3:4]
+
+axis(1, at = ref_lm_v,
+     labels = format(as.Date(ref_lm_v), format = "%d-%m"),
+     las = 2)
+
+cols <- adjustcolor(
+  c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+  alpha.f = 0.25)
+
+rect(ref_lm_v[-length(ref_lm_v)],
+     yl[1],
+     ref_lm_v[-1],
+     yl[2],
+     col = cols,
+     border = NA)
+
+x_ref <- seq(lm_i[1], lm_i[6], by = 10)
+bij <- make_bij_lm_ref(landmarks_s[[expi]], ref_lm)
+x_bij <- bij(x_ref)
+
+points(x_bij, numeric(length(x_bij)))
+
+
+# dev.off()
+
+
+```
+
+
+
+```{r}
+
+l_s <- landmarks_s[["INRA13"]] |> as.numeric()
+sp <- splines_l[["INRA13"]]
+
+date <- ref_lm[2]:ref_lm[7]
+new_date <- round(sp(date))
+
+dt_var <- dt_brute |> 
+  filter(exp == "INRA13") |> 
+  select(DATE_s, TEMP_T_Q) |> 
+  mutate(DATE_s = as.Date(DATE_s)) |> 
+  filter(as.numeric(as.Date(DATE_s)) %in% lm_i[1]:lm_i[6])
+
+plot(new_date, dt_var$TEMP_T_Q)
+
+
+# ref_lm
+# round(sp(11400)) = 11412
+
+sp <- splines_l[["BGA11"]]
+ref_lm
+sp_lm <- round(sp(ref_lm))
+sp_lm
+as.numeric(landmarks_s[["BGA11"]])
+
+
+dt_var |> 
+  mutate(DATE_s = as.numeric(DATE_s)) |> 
+  filter(DATE_s %in% sp_lm)
+
+
+dt_var_bij |> 
+  mutate(DATE_s_n = as.numeric(DATE_s_n)) |> 
+  filter(DATE_s_n %in% ref_lm)
+
+```
 
