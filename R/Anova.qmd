@@ -70,7 +70,8 @@ dt_anova$Loc <- factor(dt_anova$Loc)
 summary(dt_anova)
 ```
 
-# Régression linéaire
+
+#Régression linéaire
 
 ```{r}
 #Sur les variables qualitatives
@@ -113,14 +114,28 @@ library(plsdepot) #intègre le calcul de Q² cum en sortie, utilisé dans la th�
 
 # Séparer Y et X
 Y <- dt_anova$SY
-X <- dt_anova[, setdiff(names(dt_anova), "SY")]
-X <- subset(X, select = -c(WS_FLO,HT_FLO, PARTENAIRE))
-X <- X[,-(5:10)]
-X <- X[,-2]
-X$Year<- as.numeric(sub(".*-", "", X$Year))
+Y <- Y[-18]
+X_variables <- dt_anova[, setdiff(names(dt_anova), "SY")] 
+X_variables <- X_variables[-18,]
+rownames(X_variables) <- X_variables$PARTENAIRE
+X_variables$PARTENAIRE <- NULL
 
-View(X)
-summary(X)
+cols_pls <- colnames(X_variables)[21:89]
+vars_sel_pls <- cols_pls[grepl("TMN|WSC|SSR", cols_pls)]
+
+dt_sel_pls <- X_variables[, vars_sel_pls] %>% 
+  mutate(TMN_P = `TMN_P300` + `TMN_P600` + `TMN_P100`) %>% 
+  mutate(WSC_P = `WSC_P300` + `WSC_P600` + `WSC_P1000`) %>% 
+  mutate(SSR_P = `SSR_P300` + `SSR_P600` + `SSR_P1000`)
+dt_sel_pls <- dt_sel_pls[,-(13:21)]
+X_variables <- X_variables[,-(21:89)]
+X_variables <- cbind(X_variables, dt_sel_pls)
+X_variables <- X_variables[,-(5:10)]
+X_variables <- X_variables[,-(1:2)]
+
+summary(X_variables)
+
+#write.csv(X_variables, file = "R/X_variables")
 
 ```
 
@@ -152,12 +167,8 @@ ADB
 Pour obtenir les coefficients de refression et la perf prédictive Q² de chaque variable 
 ```{r}
 # Fit PLS sur toutes les variables
-pls_full <- plsreg1(X, Y, comps = nrow(X)-1, crosval = TRUE)  # comps=nombre max de composantes latentes
-which(pls_full$Q2 > 0.0975)
-pls_full$Q2
-pls_full$reg.coefs
-names(pls_full)
-pls_full$reg.coefs[names(coefs) != "Intercept"]
+pls_full <- plsreg1(X_variables, Y, comps = nrow(X_variables)-1, crosval = TRUE)  # comps=nombre max de composantes latentes
+
 which.max(pls_full$Q2) #renvoie le nombre de composantes qui maximise Q2
 
 ```
@@ -169,12 +180,12 @@ Conserver le modèle avec Q²cum maximal, on mémorise la combinaison de variabl
 But :Éliminer progressivement les variables les moins importantes, identifier le sous-ensemble optimal de variables qui maximise la capacité prédictive du modèle
 
 ```{r}
-variables <- colnames(X_variete)
+variables <- colnames(X_variables)
 best_Q2cum <- 0
 best_vars <- variables
 
 while (length(variables) > 1) {
-  pls_temp <- plsreg1(X_variete[, variables], Y_variete, comps = nrow(X_variete)-1, crosval = TRUE)
+  pls_temp <- plsreg1(X_variables[, variables], Y, comps = nrow(X_variables)-1, crosval = TRUE)
   coefs <- pls_temp$reg.coefs
   coefs <- coefs[names(coefs) != "Intercept"] 
   min_var <- variables[which.min(abs(coefs))]
@@ -189,21 +200,28 @@ while (length(variables) > 1) {
     best_Q2cum <- Q2cum
     best_vars <- variables
   }
-  
-  print(best_Q2cum)
-  print(best_vars)
-  
 }
 
 nb_components <- which.max(pls_temp$Q2) #3
 nb_components
 
-cat("Meilleures variables PLS :", best_vars, "\n") #63 var
+cat("Meilleures variables PLS :", best_vars, "\n")
 cat("Q2cum max :", best_Q2cum, "\n")
 
 best_vars
 
+
+
 ```
+
+#Q²cum max 
+25.78359
+
+#best_vars 24 au lieu de 27
+ [1] "Latitude"  "Longitude" "WSC_MAX"   "AN"        "ADB"       "NNI"       "Ntotal"
+ [8] "WSC_I"     "DBI"       "DAI"       "RO"        "RF"        "TMN_F"     "WSC_F"
+[15] "TMN_CW"    "WSC_CW"    "TMN_B"     "WSC_B"     "TMN_FLO"   "WSC_FLO"   "SSR_FLO"  
+[22] "TMN_P"     "WSC_P"     "SSR_P"  
 
 #Validation Leave one out
 Vérifier que les indicateurs sélectionnés par la PLS ne dépendent pas d’un environnement particulier. Un indicateur est dit robuste / cohérent s’il est sélectionné dans plus de 50 % des PLS faites en leave-one-out.
@@ -216,14 +234,14 @@ But : éviter les variables fortement dépendant d'une expérience, d'un context
 
 
 ```{r}
-n_env <- nrow(X_variete)
-selection_count <- setNames(rep(0, ncol(X_variete)), colnames(X_variete))
+n_env <- nrow(X_variables)
+selection_count <- setNames(rep(0, ncol(X_variables)), colnames(X_variables))
 
 for (i in 1:n_env) {
 
   # Retirer l'environnement i
-  X_loo <- X_variete[-i, ]
-  Y_loo <- Y_variete[-i]
+  X_loo <- X_variables[-i, ]
+  Y_loo <- Y[-i]
 
   variables <- colnames(X_loo)
   best_Q2cum <- -Inf #initialisation pour être sûre qu'il prenne la valeur max
@@ -271,7 +289,8 @@ confidence_index
 On ne garde que les variables robustes, qui sont sélectionnées dans plus de la moitié des validations LOO
 ```{r}
 consistent_vars <- names(confidence_index[confidence_index > 0.5]) #Thèse
-consistent_vars #61 variables 
+consistent_vars #22 variables pour 0.5
+                #17 pour 0.9
 ```
 
 « Les variables consistantes présentant le plus fort indice de confiance sont les plus robustes pour prédire le rendement et contribuent fortement à la variance expliquée par le modèle PLS. »
@@ -303,11 +322,112 @@ results_env <- list(
   consistent_vars = consistent_vars,
   robust_vars_table = robust_vars_table)
 
-#saveRDS(results_env, file = "resultat/PLS_results_env.rds")
+# saveRDS(results_env, file = "resultat/PLS_results_env.rds")
 
-results_env <- readRDS("PLS_results_env.rds")
+```
+
+```{r}
+results_env <- readRDS("resultat/PLS_results_env.rds")
+```
+
+#Prédiction du rendement 
+On se limite aux variables robustes : Ces variables ont été sélectionnées par la méthode Backward-Q²cum + LOO. Elles représentent les indicateurs les plus stables et fiables pour prédire Y. C
+```{r}
+pls_final <- plsreg1(X_variables[, results_env$consistent_vars], Y, comps = nrow(X_variables)-1, crosval = TRUE)  # comps=nombre max de composantes latentes
+nb_comp_opt <- which.max(pls_final$Q2)
+nb_comp_opt #renvoie le nombre de composantes qui maximise Q2 (1)
+```
+
+#Validation Leave One out pour vérifier la qualité prédictive
+L’intercept et les coefficients beta servent à calculer la prédiction pour chaque observation, mais en s’assurant que la donnée test n’a pas servi au calibrage.
+```{r}
+coef_pls <- pls_final$reg.coefs
+intercept <- coef_pls["Intercept"]
+beta <- coef_pls[names(coef_pls) != "Intercept"]
+X_sel <- X_variables[, names(beta)]
+
+n <- nrow(X_sel)
+Y_pred_loo <- numeric(n)
+
+for (i in 1:n) {
+  # Séparer train / test
+  X_train <- X_sel[-i, , drop = FALSE]
+  Y_train <- Y[-i]
+
+  X_test <- X_sel[i, , drop = FALSE]
+
+  # Ajuster le modèle PLS sur n-1 observations
+  pls_loo <- plsreg1(X_train, Y_train, comps = nb_comp_opt, crosval = FALSE)
+
+  # Coefficients
+  coef <- pls_loo$reg.coefs
+  intercept <- coef["Intercept"]
+  beta <- coef[names(coef) != "Intercept"]
+
+  # Prédiction pour l’observation i
+  Y_pred_loo[i] <- intercept + as.matrix(X_test) %*% beta
+}
+
+# RMSEP et R² prédictif LOO
+rmsep_loo <- sqrt(mean((Y - Y_pred_loo)^2))
+R2_loo <- cor(Y, Y_pred_loo)^2
+
+rmsep_loo
+R2_loo
+
+plot(Y, Y_pred_loo,
+     xlab = "Y observé",
+     ylab = "Y prédit",
+     main = "PLS – Prédiction du rendement")
+abline(0, 1, col = "red")
+```
 
 
+#PLS méthode prof
+```{r}
+library(pls)
+
+dt_pls_prof <- read.csv("R/X_variables", row.names = 1)
+dt_pls_prof <- cbind(dt_pls_prof, Y)
+
+pls1 = plsr(Y ~ .,data = dt_pls_prof, ncomp = 1, scale = TRUE) 
+
+LV = scores(pls1)       # variables latentes
+load = loadings(pls1)  #loadings d'une var explicative élevé => fort pouvoir prédictif de cette var
+plot(1:ncol(X_variables), load[,1],
+     type = "b", pch = 16, lwd = 2,
+     xlab = "Variables explicatives",
+     ylab = "Loadings",
+     main = "Loadings de la 1ère variable latente")
+
+explvar(pls1) #avec 1 composante latente, on explique 17% de la variabilité des variables explicatives
+R2(pls1) # Avec 1 composante latente, on explique 41% de la variance de Y 
+pls_cv = plsr(Y ~ .,data = dt_pls_prof,ncomp = 15,scale = TRUE, validation = "CV",segments = 10)
+RMSEP(pls_cv) #on regarde adjcv (rmsep +fiable), le modèle nul est le meilleur
+nopt = selectNcomp(pls_cv, method = "onesigma", plot = TRUE) #choix du nb de compo opt pour éviter le surapprentissage
+nopt # Aucune composante latente n’améliore significativement la prédiction par rapport au modèle intercept seul.
+pls_final = plsr(Y ~ .,data = dt_pls_prof,ncomp = nopt, scale = TRUE)
+
+```
+
+#Régression linéaire simple --> ne fonctionne pas trop de var
+```{r}
+mod_lm = lm(Y ~ ., data= dt_pls_prof)
+summary(mod_lm)
+```
+
+#Régression linéaire ridge --> pas suffisamment prédictif, Le modèle ne fait pas mieux que simplement prédire la moyenne de Y. 
+```{r}
+library(glmnet)
+set.seed(123)
+
+X_ridge = as.matrix(dt_pls_prof[, setdiff(names(dt_pls_prof), "Y")])
+cv_ridge = cv.glmnet(X_ridge, Y,alpha = 0,standardize = TRUE)
+cv_ridge$lambda.1se
+min(cv_ridge$cvm)
+sqrt(min(cv_ridge$cvm)) #RMSEP : 6.791191
+RMSEP_intercept = sd(Y) 
+RMSEP_intercept #6.43518
 ```
 
 
@@ -356,4 +476,85 @@ results_variete <- list(
 
 results_variete <- readRDS("PLS_results_variete.rds")
 ```
+
+#Faire une ACP 
+```{r}
+library(FactoMineR)
+library(Factoshiny)
+library(factoextra)
+
+X_variables <- read.csv("R/X_variables", row.names = 1)
+dt_acp <- cbind(X_variables, Y)
+
+summary(dt_acp)
+
+res.pca <- PCA(dt_acp, quanti.sup = which(colnames(dt_acp) == "Y"))
+
+groupes <- ifelse(grepl("TMN", colnames(dt_acp)), "TMN",
+           ifelse(grepl("SSR", colnames(dt_acp)), "SSR",
+           ifelse(grepl("WSC", colnames(dt_acp)) & 
+                  !(colnames(dt_acp) %in% c("WSC_MAX", "WSC_I")), "WSC", 
+           "Autres")))
+
+names(groupes) <- colnames(dt_acp)
+groupes <- groupes[names(groupes) != "Y"]
+
+fviz_pca_var(res.pca,
+             col.var = groupes,
+             palette = c("TMN" = "#e41a1c",
+                         "SSR" = "goldenrod2",
+                         "WSC" = "#377eb8",
+                         "Autres" = "grey50"),repel = TRUE) + 
+  theme(legend.position = "none")
+
+Factoshiny(dt_acp)
+
+
+```
+Les 2 premiers axes de l’ analyse expriment 41.63% de l’inertie totale du jeu de données. probablement nécessaire de considérer également les dimensions supérieures ou égales à la troisième dans l’analyse
+La dimension 1 oppose des individus tels que LIM15 et TI15(•	de fortes valeurs pour des variables telles que TMAX_P600, HT_P1000, TMAX_P1000, WD_P1000, TMN_P300, LT_CW, FR_CW, SSR_FLO, TMN_P100 et HT_F (de la plus extrême à la moins extrême).
+•	de faibles valeurs pour les variables WSC_B, WSC_P1000, LSR_P300, LSR_P600 et WSC_P600 
+) à des individus comme INRA16 et INRA13 (•	de fortes valeurs pour les variables LSR_F, LGDD_F, LT_P300, LSR_P1000, LT_FLO et LT_F, •	de faibles valeurs pour des variables telles que TMIN_P300, TMN_FLO, LGDD_FLO, TMIN_FLO, SSR_P1000, TMN_F, TMN_P600, TMN_P300, TMIN_P600 et SSR_FLO  ) 
+
+La dimension 2 oppose des individus tels que EUR18 et INRA18 •	de fortes valeurs pour les variables Year, HT_FLO, TMN_CW et LGDD_CW (de la plus extrême à la moins extrême).
+•	de faibles valeurs pour les variables QPT, TMIN_CW et TMAX_ à des individus comme RAGT14 et MAD14 (•	de fortes valeurs pour les variables LGDD_B, LT_B, LSR_B, SSR_B, TMAX_F, WS_P300 et TMIN_B (de la plus extrême à la moins extrême).
+•	de faibles valeurs pour les variables TMAX_CW, WSC_P300, SSR_F, WSC_I et SSR_CW
+)
+
+```{nuage des individus}
+
+library(ggplot2)
+library(dplyr)
+
+scores <- as.data.frame(res.pca$ind$coord)
+varprop <- res.pca$eig[,2] / 100
+axe <- c(1,2)
+V <- paste0("Dim.", axe)
+scores$SY <- dt_acp$SY
+scores$PARTENAIRE <- rownames(scores) 
+
+ggplot(scores, aes(x = Dim.1, y = Dim.2)) +
+  geom_point(aes(size = SY)) +
+  geom_hline(yintercept = 0, color = "grey68", linewidth = 0.6) + 
+  geom_vline(xintercept = 0, color = "grey68", linewidth = 0.6) +
+  geom_text(aes(label = PARTENAIRE), vjust = -1) +
+  theme_minimal() +
+  scale_x_continuous(limits = c(-8, 8),breaks = seq(-8, 8, by = 2)) +
+  scale_y_continuous(limits = c(-8, 8),breaks = seq(-8, 8, by = 2)) +
+  guides(color="none", size=guide_legend(title=paste0("SY")))+
+  theme(aspect.ratio = 1,
+    plot.title = element_text(size = 18, face = "bold"),
+    axis.title = element_text(size = 16),
+    axis.text  = element_text(size = 14),
+    legend.title = element_text(size = 13),
+    legend.text  = element_text(size = 11)) +
+  labs(title = "Nuage des individus – ACP",
+       x = "Dimension 1",
+       y = "Dimension 2")
+
+ 
+```
+
+
+
 
