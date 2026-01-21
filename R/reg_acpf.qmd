@@ -10,6 +10,8 @@ library(FactoMineR)
 library(Factoshiny)
 library(pls)
 library(fda)
+conflicted::conflicts_prefer(dplyr::filter, dplyr::select)
+
 
 
 ```
@@ -33,7 +35,6 @@ summary(meteo_lm)
 glimpse(meteo_lm)
 
 rendement <- read.csv("data/rendement.csv") |>
-  select(-X) |> 
   filter(type == "SY",
          !is.na(value)) |>
   mutate(variety = sub("^[^_]*_[^_]*_", "", variety)) |> 
