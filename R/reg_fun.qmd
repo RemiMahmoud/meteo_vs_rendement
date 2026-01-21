@@ -155,6 +155,18 @@ plot(beta_hat[[1]]$fit)
 plot(beta_hat[[2]]$fit)
 plot(beta_hat[[3]]$fit)
 
+m_X1 <- reg_fun_pfr(Y, X_f = list(X1 = X1))
+m_X2 <- reg_fun_pfr(Y, X_f = list(X2 = X2))
+m_X3 <- reg_fun_pfr(Y, X_f = list(X3 = X3))
+m_X12 <- reg_fun_pfr(Y, X_f = list(X1 = X1, X2 = X2))
+m_X13 <- reg_fun_pfr(Y, X_f = list(X1 = X1, X3 = X3))
+m_X23 <- reg_fun_pfr(Y, X_f = list(X2 = X2, X3 = X3))
+m_X123 <- reg_fun_pfr(Y, X_f = list(X1 = X1, X2 = X2, X3 = X3))
+
+AIC(m_X1, m_X2, m_X3, m_X12, m_X13, m_X23, m_X123)
+BIC(m_X1, m_X2, m_X3, m_X12, m_X13, m_X23, m_X123)
+anova(m_X1, m_X2, m_X3)
+
 
 ```
 
@@ -165,6 +177,58 @@ transformer les beta en splines, puis recuperer les coefs , puis faire selection
 recupere coef de l'acp puis faire selection variable (un elastic net) dessus avec les variables scalaires en plus
 
 faire de la selection de variables, scalaire, fonctionnelle
+
+
+
+```{r}
+
+Y <- dta$value
+X0 <- as.matrix(rep(1, length(Y)))
+X1 <- as.matrix(dta[, 23:306])
+X2 <- as.matrix(dta[, 307:590])
+X3 <- as.matrix(dta[, 591:874])
+X_f <- list("TEMP" = X1, "HYD" = X2, "RAYO" = X3)
+# rm(X1, X2, X3)
+X_s = as.data.frame(dta[, 6:22])  # pas pris les facteurs
+Kx = 30
+
+
+
+dt_m0 <- data.frame(
+  mod = character(0),
+  AIC = numeric(0),
+  BIC = numeric(0),
+  `p-v` = numeric(0)
+)
+
+for(xi in names(X_f)){
+  res <- reg_fun_pfr(Y, X_f = X_f[[xi]])
+  mod <- xi
+  AIC <- AIC(res)
+  BIC <- BIC(res)
+  
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -354,6 +418,51 @@ gain_2 <- c(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ```{r}
 
 Y <- dta$value
@@ -413,7 +522,7 @@ final_mod <- glmnet(
 
 coef(final_mod)
 plot(final_mod, xvar = "lambda")
-plot(cvmod)
+plot(final_mod)
 
 
 
@@ -531,8 +640,6 @@ summary(fd_mod_final)$p.table
 
 
 ```
-
-
 
 
 
