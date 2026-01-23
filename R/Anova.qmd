@@ -70,6 +70,13 @@ dt_anova$Loc <- factor(dt_anova$Loc)
 summary(dt_anova)
 ```
 
+#JDD exploitable
+```{r}
+X_variables <- read.csv("data/X_variables", row.names = 1)
+Y <- dt_anova$SY
+Y <- Y[-18]
+```
+
 
 #Régression linéaire
 
@@ -135,33 +142,8 @@ X_variables <- X_variables[,-(1:2)]
 
 summary(X_variables)
 
-#write.csv(X_variables, file = "R/X_variables")
-
+#write.csv(X_variables, file = "data/X_variables")
 ```
-
-WD_P300
-WD_FLO
-WS_FLO
-WD_B
-WS_B
-WD_CW
-WS_CW
-LT_P1000
-FR_P1000
-LT_P600
-FR_P600
-FR_P300
-FR_FLO
-HT_FLO
-HT_B
-HT_CW
-
-Au final, on prend aussi les qualificatifs d'ITK 
-Année
-Latitude
-Longitude
-AN
-ADB
 
 #PLS univariée
 Pour obtenir les coefficients de refression et la perf prédictive Q² de chaque variable 
@@ -210,12 +192,10 @@ cat("Q2cum max :", best_Q2cum, "\n")
 
 best_vars
 
-
-
 ```
 
 #Q²cum max 
-25.78359
+24.74348 
 
 #best_vars 24 au lieu de 27
  [1] "Latitude"  "Longitude" "WSC_MAX"   "AN"        "ADB"       "NNI"       "Ntotal"
@@ -289,7 +269,7 @@ confidence_index
 On ne garde que les variables robustes, qui sont sélectionnées dans plus de la moitié des validations LOO
 ```{r}
 consistent_vars <- names(confidence_index[confidence_index > 0.5]) #Thèse
-consistent_vars #22 variables pour 0.5
+consistent_vars #23 variables pour 0.5
                 #17 pour 0.9
 ```
 
@@ -304,6 +284,8 @@ robust_vars_table <- data.frame(
   Variable = consistent_vars,
   Confidence_Index = confidence_consistent
 )
+
+robust_vars_table <- robust_vars_table[order(robust_vars_table$Confidence_Index, decreasing = TRUE),]
 
 # Afficher le tableau
 print(robust_vars_table)
@@ -333,7 +315,7 @@ results_env <- readRDS("resultat/PLS_results_env.rds")
 #Prédiction du rendement 
 On se limite aux variables robustes : Ces variables ont été sélectionnées par la méthode Backward-Q²cum + LOO. Elles représentent les indicateurs les plus stables et fiables pour prédire Y. C
 ```{r}
-pls_final <- plsreg1(X_variables[, results_env$consistent_vars], Y, comps = nrow(X_variables)-1, crosval = TRUE)  # comps=nombre max de composantes latentes
+pls_final <- plsreg1(X_variables[, consistent_vars], Y, comps = nrow(X_variables)-1, crosval = TRUE)  # comps=nombre max de composantes latentes
 nb_comp_opt <- which.max(pls_final$Q2)
 nb_comp_opt #renvoie le nombre de composantes qui maximise Q2 (1)
 ```
@@ -383,17 +365,78 @@ abline(0, 1, col = "red")
 ```
 
 
+#calcul du RMSEP
+```{r}
+
+dt_pls_consistent <- dt_pls_prof[, c("Y", consistent_vars)]
+
+
+pls_final_rmsep <- plsr(
+  Y ~ .,
+  data = dt_pls_consistent,
+  scale = TRUE,
+  validation = "LOO",   # robuste avec petit n
+  ncomp = 16            # max raisonnable
+)
+
+
+rmsep_mod <- RMSEP(pls_final_rmsep)
+plot(rmsep_mod, legendpos = "topright")
+
+rmsep <- rmsep_mod$val["CV", , -1]  # enlève l'intercept
+opt_ncomp <- which.min(rmsep)
+
+opt_ncomp
+
+min(rmsep)
+
+coef_pls <- coef(pls_final_rmsep, ncomp = 2)
+
+coef_df <- data.frame(
+  variable = rownames(coef_pls),
+  coefficient = as.vector(coef_pls)
+)
+
+ggplot(coef_df, aes(x = reorder(variable, coefficient), y = coefficient)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = paste("Coefficients PLS (2 composantes)", sep=""),
+       x = "Variable",
+       y = "Coefficient") +
+  theme_classic()
+
+Y_pred <- as.vector(
+  predict(pls_final_rmsep, ncomp = opt_ncomp)
+)
+
+Y_obs <- dt_pls_consistent$Y
+
+R2 <- cor(Y_obs, Y_pred)^2
+
+plot(
+  Y_obs, Y_pred,
+  pch = 19,
+  xlab = "Y observé",
+  ylab = "Y prédit (PLS)",
+  main = paste0("PLS – Observé vs Prédit (R² = ", round(R2, 3), ")")
+)
+
+abline(0, 1, col = "red", lwd = 2)  # droite y = x
+
+```
+
+
 #PLS méthode prof
 ```{r}
 library(pls)
 
-dt_pls_prof <- read.csv("R/X_variables", row.names = 1)
+dt_pls_prof <- read.csv("data/X_variables", row.names = 1)
 dt_pls_prof <- cbind(dt_pls_prof, Y)
 
-pls1 = plsr(Y ~ .,data = dt_pls_prof, ncomp = 1, scale = TRUE) 
+pls1 = plsr(Y ~ .,data = dt_pls_prof, ncomp = 17, scale = TRUE) 
 
 LV = scores(pls1)       # variables latentes
-load = loadings(pls1)  #loadings d'une var explicative élevé => fort pouvoir prédictif de cette var
+load = pls::loadings(pls1)  #loadings d'une var explicative élevé => fort pouvoir prédictif de cette var
 plot(1:ncol(X_variables), load[,1],
      type = "b", pch = 16, lwd = 2,
      xlab = "Variables explicatives",
@@ -401,14 +444,73 @@ plot(1:ncol(X_variables), load[,1],
      main = "Loadings de la 1ère variable latente")
 
 explvar(pls1) #avec 1 composante latente, on explique 17% de la variabilité des variables explicatives
-R2(pls1) # Avec 1 composante latente, on explique 41% de la variance de Y 
-pls_cv = plsr(Y ~ .,data = dt_pls_prof,ncomp = 15,scale = TRUE, validation = "CV",segments = 10)
+R2(pls1) # Avec 15 composante latente, on explique 99% de la variance de Y 
+pls_cv = plsr(Y ~ .,data = dt_pls_prof,ncomp = 15,scale = TRUE, validation = "LOO")
+
 RMSEP(pls_cv) #on regarde adjcv (rmsep +fiable), le modèle nul est le meilleur
 nopt = selectNcomp(pls_cv, method = "onesigma", plot = TRUE) #choix du nb de compo opt pour éviter le surapprentissage
 nopt # Aucune composante latente n’améliore significativement la prédiction par rapport au modèle intercept seul.
 pls_final = plsr(Y ~ .,data = dt_pls_prof,ncomp = nopt, scale = TRUE)
 
 ```
+
+#Correction package PLS
+```{r}
+
+pls1 = plsr(Y ~ .,data = dt_pls_prof,validation = "LOO", ncomp = 16, scale = TRUE) 
+
+n <- length(Y)
+Y_LOO <- numeric(n)
+
+for (i in 1:n) {
+  Y_LOO[i] <- mean(Y[-i])   # moyenne sans l'observation i
+}
+
+rmsep_null_LOO <- sqrt(mean((Y - Y_LOO)^2))
+rmsep_null_LOO
+
+rmsep_mod <- RMSEP(pls1)
+plot(rmsep_mod, legendpos = "topright")
+
+rmsep <- rmsep_mod$val["CV", , -1]  # enlève l'intercept
+opt_ncomp <- which.min(rmsep)
+opt_ncomp
+
+min(rmsep)
+
+coef_pls <- coef(pls1, ncomp = 2)
+
+coef_df <- data.frame(
+  variable = rownames(coef_pls),
+  coefficient = as.vector(coef_pls)
+)
+
+ggplot(coef_df, aes(x = reorder(variable, coefficient), y = coefficient)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = paste("Coefficients PLS (2 composantes)", sep=""),
+       x = "Variable",
+       y = "Coefficient") +
+  theme_classic()
+
+Y_pred <- as.vector(  predict(pls1, ncomp = opt_ncomp))
+Y_obs <- dt_pls_prof$Y
+
+R2 <- cor(Y_obs, Y_pred)^2
+
+plot(
+  Y_obs, Y_pred,
+  pch = 19,
+  xlab = "Y observé",
+  ylab = "Y prédit (PLS)",
+  main = paste0("PLS – Observé vs Prédit (R² = ", round(R2, 3), ")")
+)
+
+abline(0, 1, col = "red", lwd = 2)  # droite y = x
+
+```
+
+
 
 #Régression linéaire simple --> ne fonctionne pas trop de var
 ```{r}
@@ -419,15 +521,102 @@ summary(mod_lm)
 #Régression linéaire ridge --> pas suffisamment prédictif, Le modèle ne fait pas mieux que simplement prédire la moyenne de Y. 
 ```{r}
 library(glmnet)
-set.seed(123)
 
 X_ridge = as.matrix(dt_pls_prof[, setdiff(names(dt_pls_prof), "Y")])
-cv_ridge = cv.glmnet(X_ridge, Y,alpha = 0,standardize = TRUE)
-cv_ridge$lambda.1se
-min(cv_ridge$cvm)
+
+cv_ridge = cv.glmnet(X_ridge, Y,alpha = 0)
+rmsep_ridge <- sqrt(cv_ridge$cvm) 
+
+plot(cv_ridge$lambda, rmsep_ridge, type="b", log="x",
+     xlab="Lambda", ylab="RMSEP",
+     main="RMSEP Ridge")
+abline(v = cv_ridge$lambda.min, col="red", lty=2)  # lambda optimal
+legend("topright", legend="Lambda optimal", lty=2, col="red")
+
+coef_ridge <- as.matrix(coef(cv_ridge, s = "lambda.min"))
+coef_df <- data.frame(
+  variable = rownames(coef_ridge)[-1],  # enlever l'intercept
+  coefficient = coef_ridge[-1, 1]       # enlever l'intercept
+)
+
+# Plot
+ggplot(coef_df, aes(x = reorder(variable, coefficient), y = coefficient)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Coefficients Ridge (lambda optimal)",
+       x = "Variable",
+       y = "Coefficient") +
+  theme_classic()
+
 sqrt(min(cv_ridge$cvm)) #RMSEP : 6.791191
 RMSEP_intercept = sd(Y) 
 RMSEP_intercept #6.43518
+
+Y_pred_ridge <- as.vector(predict(cv_ridge, s="lambda.min", newx = X_ridge))
+
+R2_ridge <- cor(Y, Y_pred_ridge)^2
+
+plot(
+  Y_obs, Y_pred,
+  pch = 19,
+  xlab = "Y observé",
+  ylab = "Y prédit (PLS)",
+  main = paste0("PLS – Observé vs Prédit (R² = ", round(R2, 3), ")")
+)
+
+abline(0, 1, col = "red", lwd = 2)  # droite y = x
+
+```
+
+#Lasso
+```{r}
+library(glmnet)
+
+X_ridge = as.matrix(dt_pls_prof[, setdiff(names(dt_pls_prof), "Y")])
+
+cv_lasso = cv.glmnet(X_ridge, Y,alpha = 1)
+rmsep_lasso <- sqrt(cv_lasso$cvm) 
+
+plot(cv_lasso$lambda, rmsep_lasso, type="b", log="x",
+     xlab="Lambda", ylab="RMSEP",
+     main="RMSEP lasso")
+abline(v = cv_lasso$lambda.min, col="red", lty=2)  # lambda optimal
+legend("topright", legend="Lambda optimal", lty=2, col="red")
+
+coef_lasso <- as.matrix(coef(cv_lasso, s = "lambda.min"))
+coef_df_lasso <- data.frame(
+  variable = rownames(coef_lasso)[-1],  # enlever l'intercept
+  coefficient = coef_lasso[-1, 1]       # enlever l'intercept
+)
+
+# Plot
+ggplot(coef_df_lasso, aes(x = reorder(variable, coefficient), y = coefficient)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Coefficients Lasso (lambda optimal)",
+       x = "Variable",
+       y = "Coefficient") +
+  theme_classic()
+
+sqrt(min(cv_lasso$cvm)) 
+RMSEP_intercept = sd(Y) 
+RMSEP_intercept 
+
+Y_pred_lasso <- as.vector(predict(cv_lasso, s="lambda.min", newx = X_ridge))
+
+R2_lasso<- cor(Y, Y_pred_lasso)^2
+
+plot(
+  Y, Y_pred_lasso,
+  pch = 19,
+  xlab = "Y observé",
+  ylab = "Y prédit (PLS)",
+  main = paste0("PLS – Observé vs Prédit (R² = ", round(R2_lasso, 3), ")")
+)
+
+abline(0, 1, col = "red", lwd = 2)  # droite y = x
+
+```
 ```
 
 

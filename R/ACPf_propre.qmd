@@ -338,9 +338,9 @@ plot_courbe <- function(variable, brute = F, normaliser = F, experience = NULL, 
   if(variable == "TEMP_T_Q"){
     ylab <- "Température moyenne quotidienne"
   } else if (variable == "RAYO_SSI_Q"){
-    ylab <- "Rayonnement quotidienne"
+    ylab <- "Rayonnement solaire quotidien"
   } else if (variable == "E.HYD_WSC"){
-    ylab <- "Teneur en eau quotidienne"
+    ylab <- "Water Soil Content"
   }
   
   if(normaliser){
