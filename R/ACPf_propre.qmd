@@ -131,19 +131,20 @@ plot_harmonique <- function(acpf, i, variable){
   y_text <- ylim[1] + 0.05 * diff(ylim)
   
   x_centers <- (ref_lm_v[-length(ref_lm_v)] + ref_lm_v[-1]) / 2  # centre des rectangles
-  y_label <- ylim[1] - 0.1 * diff(ylim)                         # un peu en dessous
+  y_label <- ylim[1] - 0.3 * (ylim - ylim[1])                     # un peu en dessous
   text(x = x_centers[1:length(saison)], 
        y = y_label, 
        labels = saison, 
-       cex = 0.9, 
+       cex = 1.3, 
        xpd = TRUE)
   # dev.off()
   
 }
 
-fdobj <- data_acp_f(RAYO_SSI_Q, centre = F, plot = F)
+# E.HYD_WSC
+fdobj <- data_acp_f(TEMP_T_Q, centre = F, plot = F, nbspines = 10)
 acpf <- pca.fd(fdobj, nharm = 5)
-plot_harmonique(acpf, 1, "RAYO_SSI_Q")
+plot_harmonique(acpf, 5, "TEMP_T_Q")
 
 #plot_harmonique(acpf, 1)  #humidité moyenne
 #plot_harmonique(acpf, 2)  #sec fin
@@ -191,7 +192,7 @@ plot_indiv <- function(acpf, type_rend, var, axe, variable){
             legend.text  = element_text(size = 11))+
       labs(x = paste0("Dimension ", axe[1], " : ", round(acpf$varprop[axe[1]], 2)*100, "%"),
            y = paste0("Dimension ", axe[2], " : ", round(acpf$varprop[axe[2]], 2)*100, "%"),
-           title = paste0("Le rendement ", type_rend, " sur le plan de l'ACP (axes ", axe[1], " et ", axe[2], ") avec la variable ", variable))
+           title = paste0("Le rendement ", type_rend, "\nsur le plan de l'ACP (axes ", axe[1], " et ", axe[2], ")\navec la variable ", variable))
     
   }else if(length(axe) == 1){
     
@@ -213,7 +214,7 @@ plot_indiv <- function(acpf, type_rend, var, axe, variable){
             legend.text  = element_text(size = 11))+
       labs(x = paste0("Dimension ", axe[1], " : ", round(acpf$varprop[axe[1]], 2)*100, "%"),
            y = "",
-           title = paste0("Le rendement ", type_rend, " sur l'axe de l'ACP (axe ", axe[1], ") avec la variable ", variable))
+           title = paste0("Le rendement ", type_rend, "\n sur l'axe de l'ACP (axe ", axe[1], ")\navec la variable ", variable))
     
   }
 }
@@ -254,17 +255,15 @@ fun_acpf_plot <- function(variable,
   # plot fonction moyenne
   plot(mean.fd(fdobj))
   
-  plot_harmonique(acpf, 1, variable)
-  plot_harmonique(acpf, 2, variable)
-  plot_harmonique(acpf, 3, variable)
-  plot_harmonique(acpf, 4, variable)
-  plot_harmonique(acpf, 5, variable)
+  for (i in 1:nharm){
+    plot_harmonique(acpf, i, variable)
+  }
   
   plot_indiv(acpf, type_rend = type_rend, var = var, axe = axe, variable={{variable}} ) 
   
 }
 
-fun_acpf_plot("TEMP_T_Q", nbspines = 10, axe = c(1, 3), type_rend = "SY")
+fun_acpf_plot("TEMP_T_Q", nbspines = 10, axe = c(1, 2), type_rend = "SY")
 
 
 ```
