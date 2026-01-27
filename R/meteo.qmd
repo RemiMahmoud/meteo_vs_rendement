@@ -586,50 +586,50 @@ for (name in names(dts)){
   ##### PLOT ####
   
   #png(paste0("image/bij/bij_", name,".png"), width = 6, height = 6, units = "in", res = 300)
-  
-  plot(date, new_date,
-       type = "l",
-       asp = 1,
-       xaxt = "n", yaxt = "n",
-       xlab = "Dates de référence", 
-       ylab = "Dates réelles",
-       main = name)  
-  
-  axis(1,
-       at = ref_lm[2:7],
-       labels = format(as.Date(ref_lm[2:7]), format = "%d-%m"),
-       las = 2)
-  axis(2,
-       at = lm_i,
-       labels = format(as.Date(as.numeric(lm_i)), format = "%d-%m"),
-       las = 2)
-  
-  cols <- adjustcolor(
-    c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
-    alpha.f = 0.25)
-  
-  
-  
-  rect(ref_lm_v[-length(ref_lm_v)],  # xleft
-       lm_i[1],                # ybottom
-       ref_lm_v[-1],               # xright
-       lm_i[-1],                # ytop
-       col = cols,
-       border = NA)
-  rect(ref_lm_v[1],  # xleft
-       lm_i[-length(lm_i)],                # ybottom
-       ref_lm_v[-1],               # xright
-       lm_i[-1],                # ytop
-       col = cols,
-       border = NA)
-  
-  points(ref_lm[2:7],
-         lm_i,
-         col = "black",
-         pch = 16,
-         cex = 2,
-  )
-  
+  # 
+  # plot(date, new_date,
+  #      type = "l",
+  #      asp = 1,
+  #      xaxt = "n", yaxt = "n",
+  #      xlab = "Dates de référence", 
+  #      ylab = "Dates réelles",
+  #      main = name)  
+  # 
+  # axis(1,
+  #      at = ref_lm[2:7],
+  #      labels = format(as.Date(ref_lm[2:7]), format = "%d-%m"),
+  #      las = 2)
+  # axis(2,
+  #      at = lm_i,
+  #      labels = format(as.Date(as.numeric(lm_i)), format = "%d-%m"),
+  #      las = 2)
+  # 
+  # cols <- adjustcolor(
+  #   c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+  #   alpha.f = 0.25)
+  # 
+  # 
+  # 
+  # rect(ref_lm_v[-length(ref_lm_v)],  # xleft
+  #      lm_i[1],                # ybottom
+  #      ref_lm_v[-1],               # xright
+  #      lm_i[-1],                # ytop
+  #      col = cols,
+  #      border = NA)
+  # rect(ref_lm_v[1],  # xleft
+  #      lm_i[-length(lm_i)],                # ybottom
+  #      ref_lm_v[-1],               # xright
+  #      lm_i[-1],                # ytop
+  #      col = cols,
+  #      border = NA)
+  # 
+  # points(ref_lm[2:7],
+  #        lm_i,
+  #        col = "black",
+  #        pch = 16,
+  #        cex = 2,
+  # )
+  # 
   #dev.off()
   
 }
@@ -745,7 +745,7 @@ rect(lm_i[-length(lm_i)],
      border = NA)
 
 x_ref <- seq(lm_i[1], lm_i[6], by = 10)
-points(x_ref, numeric(length(x_ref)))
+points(x_ref, rep(50, length(x_ref)))
 
 # dev.off()
 
@@ -756,19 +756,19 @@ points(x_ref, numeric(length(x_ref)))
 ```{r plot dt brute bij}
 
 
-# png(paste0("image/bij/HYD_ref_", expi,".png"), width = 6, height = 4, units = "in", res = 300)
+png(paste0("image/reg_fun/TEMP_ref_", expi,".png"), width = 6, height = 4, units = "in", res = 300)
 
 dt_var_bij <- dts_lm |> 
   filter(exp == expi) |> 
-  select(date_ref, E.HYD_WSC) |> 
+  select(date_ref, TEMP_T_Q) |> 
   mutate(date_ref_d = as.Date(date_ref)) |> 
   filter(date_ref %in% ref_lm_v[1]:ref_lm_v[6])
 
-plot(dt_var_bij$date_ref_d, dt_var_bij$E.HYD_WSC,
+plot(dt_var_bij$date_ref_d, dt_var_bij$TEMP_T_Q,
      type = "l",
      xaxt = "n",
      xlab = "Dates de référence", 
-     ylab = "Water soil content",
+     ylab = "Température",
      main = paste0(expi, " - référentiel plante"))
 
 yl <- par("usr")[3:4]
@@ -788,14 +788,14 @@ rect(ref_lm_v[-length(ref_lm_v)],
      col = cols,
      border = NA)
 
-x_ref <- seq(lm_i[1], lm_i[6], by = 10)
+x_ref <- seq(ref_lm_v[1], ref_lm_v[6], by = 10)
 bij <- make_bij_lm_ref(landmarks_s[[expi]], ref_lm)
 x_bij <- bij(x_ref)
 
-points(x_bij, numeric(length(x_bij)))
+points(x_bij, rep(50, length(x_bij)))
 
 
-# dev.off()
+dev.off()
 
 
 ```
