@@ -129,9 +129,9 @@ dta_acpf <- dta |>
 summary(dta_acpf)
 
 
+cor_r_T3 <- cor.test(dta_acpf$value , dta_acpf$PC3_TEMP)
 
-
-
+# dta_acpf |> filter (type == "SY") |> ggplot(aes(x =  PC3_TEMP, y = value)) + geom_point() + geom_smooth(method = "lm") + labs(y = "rendement", title = paste0("Rendement en fonction de PC3 de température :\nCoef = ", round(cor_r_T3$estimate, 2))) + theme(text = element_text(size = 20))
 ```
 
 
@@ -272,7 +272,7 @@ ggplot(results, aes(nb_HYD, nb_RAYO, fill = RMSEP_min)) +
 
 ```{r}
 
-cor <- cor(dta[, c(3, 6:36)])
+cor <- cor(dta_acpf[, c(3, 6:36)])
 corrplot::corrplot(cor)
 #value*PC3_RAYO = -0.53
 #value*PC4_HYD = -0.38
