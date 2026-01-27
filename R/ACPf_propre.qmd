@@ -102,8 +102,6 @@ fdobj <- data_acp_f(E.HYD_WSC, centre = F, plot = T)
 ```{r plot_harmonique}
 
 plot_harmonique <- function(acpf, i, variable){
-  # png(filename = paste0("image/PC", i, "_", variable, ".png"),
-  #     width = 1800, height = 900, res = 180)
   
   fd_eval <- eval.fd(seq(11219, 11502, length.out = 100), acpf$harmonics[i])
   
@@ -137,8 +135,6 @@ plot_harmonique <- function(acpf, i, variable){
        labels = saison, 
        cex = 1.3, 
        xpd = TRUE)
-  # dev.off()
-  
 }
 
 # E.HYD_WSC
@@ -256,14 +252,17 @@ fun_acpf_plot <- function(variable,
   plot(mean.fd(fdobj))
   
   for (i in 1:nharm){
+    # png(filename = paste0("image/PC_f/PC", i, "_", variable, "_", nbspines, ".png"),
+    #     width = 1800, height = 900, res = 180)
     plot_harmonique(acpf, i, variable)
+    # dev.off()
   }
   
   plot_indiv(acpf, type_rend = type_rend, var = var, axe = axe, variable={{variable}} ) 
   
 }
 
-fun_acpf_plot("TEMP_T_Q", nbspines = 10, axe = c(1, 2), type_rend = "SY")
+fun_acpf_plot("TEMP_T_Q", nbspines = 10, axe = c(1, 3), type_rend = "SY")
 
 
 ```
