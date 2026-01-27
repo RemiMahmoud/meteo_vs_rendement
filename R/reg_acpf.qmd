@@ -56,7 +56,10 @@ dta <- rendement |>
   mutate(variety = as.factor(variety),
          Year = as.factor(Year))
 
-rm(rendement, info, landmark)
+ref_lm <- read.csv("data/ref_lm.csv")
+ref_lm_v <- ref_lm$x[2:7]
+
+rm(rendement, info, landmark, ref_lm)
 
 ```
 
@@ -109,19 +112,21 @@ data_acp_f <- function(var, centre = F, plot = T, nbspines = 30){
 ```{r}
 
 
-acpf_HYD <- pca.fd(data_acp_f(E.HYD_WSC, centre = T, plot = F, nbspines = 10), nharm = 5)
-acpf_TEMP <- pca.fd(data_acp_f(TEMP_T_Q, centre = T, plot = F, nbspines = 10), nharm = 5)
-acpf_RAYO <- pca.fd(data_acp_f(RAYO_SSI_Q, centre = T, plot = F, nbspines = 10), nharm = 5)
+acpf_HYD <- pca.fd(data_acp_f(E.HYD_WSC, centre = F, plot = F, nbspines = 15), nharm = 5)
+acpf_TEMP <- pca.fd(data_acp_f(TEMP_T_Q, centre = F, plot = F, nbspines = 10), nharm = 5)
+acpf_RAYO <- pca.fd(data_acp_f(RAYO_SSI_Q, centre = F, plot = F, nbspines = 20), nharm = 5)
 colnames(acpf_HYD$scores) <- c("PC1_HYD", "PC2_HYD", "PC3_HYD", "PC4_HYD" ,"PC5_HYD")
 colnames(acpf_TEMP$scores) <- c("PC1_TEMP", "PC2_TEMP", "PC3_TEMP", "PC4_TEMP" ,"PC5_TEMP")
 colnames(acpf_RAYO$scores) <- c("PC1_RAYO", "PC2_RAYO", "PC3_RAYO", "PC4_RAYO" ,"PC5_RAYO")
 
-dta <- dta |> 
-  left_join(acpf_HYD$scores |> cbind(data.frame(exp = noms))) |>
-  left_join(acpf_TEMP$scores |> cbind(data.frame(exp = noms)))|> 
-  left_join(acpf_RAYO$scores |> cbind(data.frame(exp = noms))) 
 
-summary(dta)
+dta_acpf <- dta |> 
+  left_join(acpf_HYD$scores |> cbind(data.frame(exp = noms))) |>
+  left_join(acpf_TEMP$scores |> cbind(data.frame(exp = noms))) |> 
+  left_join(acpf_RAYO$scores |> cbind(data.frame(exp = noms))) |>
+  select(-DUREE_FLO)
+
+summary(dta_acpf)
 
 
 
@@ -133,14 +138,11 @@ summary(dta)
 
 ```{r}
 
-# Factoshiny(dta)
 
-dta <- dta |> 
-  select(-DUREE_FLO)
 
 mod <- plsr(
   value ~ .,
-  data = dta[, c(3, 6:36)],
+  data = dta_acpf[, c(3, 6:36)],
   scale = TRUE,
   validation = "LOO",   # robuste avec petit n
   ncomp = 20            # max raisonnable
@@ -156,9 +158,7 @@ opt_ncomp
 
 min(rmsep)
 
-rmsep[10]
-
-coef_pls <- coef(mod, ncomp = 10)
+coef_pls <- coef(mod, ncomp = opt_ncomp)
 
 coef_df <- data.frame(
   variable = rownames(coef_pls),
@@ -168,7 +168,9 @@ coef_df <- data.frame(
 ggplot(coef_df, aes(x = reorder(variable, coefficient), y = coefficient)) +
   geom_col(fill = "steelblue") +
   coord_flip() +
-  labs(title = paste("Coefficients PLS (10 composantes)", sep=""),
+  labs(title = paste0("Coefficients PLS (",
+                      opt_ncomp, " composantes) : RMSEP = ",
+                      round(min(rmsep), 2)),
        x = "Variable",
        y = "Coefficient") +
   theme_classic()
@@ -177,4 +179,166 @@ ggplot(coef_df, aes(x = reorder(variable, coefficient), y = coefficient)) +
 ```
 
 
+
+
+
+
+```{r}
+grid <- expand.grid(
+  nb_HYD  = 5:25,
+  nb_RAYO = 15:25
+)
+run_benchmark <- function(nb_HYD, nb_RAYO) {
+  
+  # ACP fonctionnelles
+  acpf_HYD <- pca.fd(
+    data_acp_f(E.HYD_WSC, centre = FALSE, plot = FALSE, nbspines = nb_HYD),
+    nharm = 5
+  )
+  
+  acpf_TEMP <- pca.fd(
+    data_acp_f(TEMP_T_Q, centre = FALSE, plot = FALSE, nbspines = 10),
+    nharm = 5
+  )
+  
+  acpf_RAYO <- pca.fd(
+    data_acp_f(RAYO_SSI_Q, centre = FALSE, plot = FALSE, nbspines = nb_RAYO),
+    nharm = 5
+  )
+  
+  
+  scores_HYD <- as.data.frame(acpf_HYD$scores)
+  scores_HYD$exp <- noms
+  
+  scores_TEMP <- as.data.frame(acpf_TEMP$scores)
+  scores_TEMP$exp <- noms
+  
+  scores_RAYO <- as.data.frame(acpf_RAYO$scores)
+  scores_RAYO$exp <- noms
+  
+  # Dataset PLS
+  dta_tmp <- dta |>
+    left_join(scores_HYD,  by = "exp") |>
+    left_join(scores_TEMP, by = "exp") |>
+    left_join(scores_RAYO, by = "exp") |>
+    select(-DUREE_FLO)
+  
+  # PLS
+  mod <- plsr(
+    value ~ .,
+    data = dta_tmp[, c(3, 6:ncol(dta_tmp))],
+    scale = TRUE,
+    validation = "LOO",
+    ncomp = 20
+  )
+  
+  rmsep <- RMSEP(mod)$val["CV", , -1]
+  min_rmsep <- min(rmsep, na.rm = TRUE)
+  opt_ncomp <- which.min(rmsep)
+  
+  return(
+    data.frame(
+      nb_HYD     = nb_HYD,
+      nb_RAYO    = nb_RAYO,
+      RMSEP_min  = min_rmsep,
+      ncomp_opt  = opt_ncomp
+    )
+  )
+}
+
+
+results <- do.call(
+  rbind,
+  apply(grid, 1, function(x)
+    run_benchmark(x["nb_HYD"], x["nb_RAYO"]))
+)
+
+best <- results[which.min(results$RMSEP_min), ]
+best
+
+ggplot(results, aes(nb_HYD, nb_RAYO, fill = RMSEP_min)) +
+  geom_tile() +
+  scale_fill_viridis_c() +
+  labs(
+    title = "Benchmark du nombre de splines (TEMP fixé à 10)",
+    x = "Nb splines HYD",
+    y = "Nb splines RAYO",
+    fill = "RMSEP (LOO)"
+  ) +
+  theme_minimal()
+```
+
+
+
+```{r}
+
+cor <- cor(dta[, c(3, 6:36)])
+corrplot::corrplot(cor)
+#value*PC3_RAYO = -0.53
+#value*PC4_HYD = -0.38
+#value*PC3_TEMP = -0.36
+#value*PC4_RAYO = -0.08
+#value*PC1_HYD  = -0.004
+```
+
+
+
+```{r}
+
+
+
+
+
+
+t <- 11219:11502
+sign_TEMP_acp <- numeric(length(t))
+
+for (i in seq_len(5)) {
+  
+  coef_i <- coef_df |>
+    filter(variable == paste0("PC", i, "_TEMP")) |>
+    pull(coefficient)
+  
+  sign_TEMP_acp <- sign_TEMP_acp +
+    coef_i * eval.fd(t, acpf_TEMP$harmonics[i])
+}
+
+
+png(filename = paste0("image/reg_fun/sing_asso_TEMP_norm.png"), 
+    width = 1800, height = 900, res = 180)
+
+ylim <- par("usr")[3:4]
+num <- c("Première", "Deuxième", "Troisième", "Quatrième", "Cinquième")
+saison <- c("AUTOMNE", "HIVER", "MONTAISON", "FLORAISON", "P300-P1000")
+
+
+plot(t, sign_TEMP_acp,
+     type = "l",
+     xlab = "", ylab = "sign_TEMP_acp",
+     main = "sign asso TEMP norm")
+
+
+cols <- adjustcolor(
+  c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+  alpha.f = 0.25)
+
+rect(ref_lm_v[-length(ref_lm_v)],  # xleft
+     ylim[1],                # ybottom
+     ref_lm_v[-1],               # xright
+     ylim[2],                # ytop
+     col = cols,
+     border = NA)
+
+y_text <- ylim[1] + 0.05 * diff(ylim)
+
+x_centers <- (ref_lm_v[-length(ref_lm_v)] + ref_lm_v[-1]) / 2  # centre des rectangles
+y_label <- ylim[1] - 0.1 * diff(ylim)                         # un peu en dessous
+text(x = x_centers[1:length(saison)], 
+     y = y_label, 
+     labels = saison, 
+     cex = 0.9, 
+     xpd = TRUE)
+dev.off()
+
+```
 
