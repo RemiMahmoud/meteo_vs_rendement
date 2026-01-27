@@ -61,7 +61,12 @@ dta <- rendement |>
          Year = as.factor(Year))
 
 
+ref_lm <- read.csv("data/ref_lm.csv")
+ref_lm_v <- ref_lm$x[2:7]
+
 summary(dta[, 3:22])
+
+rm(dt_meteo, info, landmark, rendement, noms, ref_lm)
 ```
 
 
@@ -106,25 +111,35 @@ reg_fun_pfr <- function(Y, X_f = list(), X_s = data.frame(), Kx = 30){
   # Formule complète
   formule <- as.formula(paste("Y ~", formule))
   
+  
+  # donnees centré réduite
+  X_f <- lapply(X_f, function(data_var) {
+    m <- mean(data_var)
+    s <- sd(data_var - m)
+    
+    data_var <- (data_var - m) / s
+    data_var <- as.matrix(data_var)})
+  
+  X_s <- lapply(X_s, function(x) {
+    x <- as.numeric(x)
+    x <- x - mean(x)
+    if (sd(x) > 0) x <- x / sd(x)
+    x
+  })
+  
+  Y <- Y - mean(Y)
+  
   # Données pour pfr()
   data_list <- c(
     list(Y = Y),
     setNames(X_f, X_names_f),
     as.list(X_s))
   
-  # donnees
-  X_f <- lapply(X_f, function(data_var) {
-    m <- mean(data_var)
-    s <- sd(data_var - m)
-    
-    data_var <- (data_var - m) / s 
-    data_var <- as.matrix(data_var)})
-  
   
   fd_mod <- pfr(
-      formula = formule,
-      data = data_list
-    )
+    formula = formule,
+    data = data_list
+  )
   
   return(fd_mod)
 }
@@ -192,22 +207,118 @@ X_f <- list("TEMP" = X1, "HYD" = X2, "RAYO" = X3)
 X_s = as.data.frame(dta[, 6:22])  # pas pris les facteurs
 Kx = 30
 
+fd_mod <- reg_fun_pfr(Y, X_f = list(X1 = X1))
+summary(fd_mod)
+AIC(fd_mod)
 
+plot(fd_mod)
 
 dt_m0 <- data.frame(
   mod = character(0),
   AIC = numeric(0),
-  BIC = numeric(0),
-  `p-v` = numeric(0)
+  BIC = numeric(0)
 )
 
 for(xi in names(X_f)){
-  res <- reg_fun_pfr(Y, X_f = X_f[[xi]])
+  res <- reg_fun_pfr(Y, X_f = list(xi = X_f[[xi]]))
   mod <- xi
   AIC <- AIC(res)
   BIC <- BIC(res)
-  
+  dt_m0 <- rbind(dt_m0, data.frame(mod = xi, AIC = AIC, BIC = BIC))
 }
+for(xi in names(X_s)){
+  res <- reg_fun_pfr(Y, X_s = list(xi = X_s[[xi]]))
+  mod <- xi
+  AIC <- AIC(res)
+  BIC <- BIC(res)
+  dt_m0 <- rbind(dt_m0, data.frame(mod = xi, AIC = AIC, BIC = BIC))
+}
+
+```
+
+La variable qui minimise le AIC et le BIC est TEMP
+
+
+```{r}
+Y <- dta$value
+X1 <- as.matrix(dta[, 23:306])
+X2 <- as.matrix(dta[, 307:590])
+X3 <- as.matrix(dta[, 591:874])
+X_f <- list("TEMP" = X1, "HYD" = X2, "RAYO" = X3)
+rm(X1, X2, X3)
+X_s = as.data.frame(dta[, c(6:20, 22)])
+crit = "BIC"
+
+# Modèle initial
+X_f_sel <- list(TEMP = X_f$TEMP)
+X_s_sel <- list()
+
+mod_current <- reg_fun_pfr(Y, X_f = X_f_sel)
+crit_current <- AIC(mod_current)   # ou AIC
+
+X_f_remain <- X_f
+X_f_remain$TEMP <- NULL
+
+X_s_remain <- X_s
+
+
+```
+
+
+```{r}
+step_forward <- function(Y, X_f_sel, X_s_sel, X_f_remain, X_s_remain,
+                         crit = c("AIC", "BIC")) {
+  
+  crit <- match.arg(crit)
+  best_crit <- Inf
+  best_var <- NULL
+  best_type <- NULL
+  best_model <- NULL
+  
+  # Tester les variables fonctionnelles
+  for (xi in names(X_f_remain)) {
+    mod <- reg_fun_pfr(
+      Y,
+      X_f = c(X_f_sel, list(X_f_remain[[xi]])),
+      X_s = X_s_sel
+    )
+    val <- if (crit == "AIC") AIC(mod) else BIC(mod)
+    
+    if (val < best_crit) {
+      best_crit <- val
+      best_var <- xi
+      best_type <- "f"
+      best_model <- mod
+    }
+  }
+  
+  # Tester les variables scalaires
+  for (xi in names(X_s_remain)) {
+    X_s = c(X_s_sel, setNames(list(X_s_remain[[xi]]), xi))
+    
+    mod <- reg_fun_pfr(
+      Y,
+      X_f = X_f_sel,
+      X_s = X_s
+    )
+    val <- if (crit == "AIC") AIC(mod) else BIC(mod)
+    
+    if (val < best_crit) {
+      best_crit <- val
+      best_var <- xi
+      best_type <- "s"
+      best_model <- mod
+    }
+  }
+  
+  return(list(
+    best_var = best_var,
+    best_type = best_type,
+    best_crit = best_crit,
+    best_model = best_model
+  ))
+}
+
 
 ```
 
@@ -215,19 +326,398 @@ for(xi in names(X_f)){
 
 
 
+```{r}
+improve <- TRUE
+i <- 0
+while (improve) {
+  i <- i + 1
+  print(paste0("iteration - ", i))
+  
+  res <- step_forward(
+    Y,
+    X_f_sel, X_s_sel,
+    X_f_remain, X_s_remain,
+    crit = "AIC"   # ou "BIC"
+  )
+  
+  if (is.null(res$best_var) || res$best_crit >= crit_current) {
+    improve <- FALSE
+  } else {
+    crit_current <- res$best_crit
+    mod_current <- res$best_model
+    
+    if (res$best_type == "f") {
+      X_f_sel[[res$best_var]] <- X_f_remain[[res$best_var]]
+      X_f_remain[[res$best_var]] <- NULL
+    } else {
+      X_s_sel[[res$best_var]] <- X_s_remain[[res$best_var]]
+      X_s_remain[[res$best_var]] <- NULL
+    }
+    
+    cat("Ajout de", res$best_var, "\n- AIC =", AIC(mod_current), "\n- BIC =", BIC(mod_current), "\n")
+  }
+  print(paste("var fun - ", paste(names(X_f_sel))))
+  print(paste("var scal - ", paste(names(X_s_sel))))
+  mod_cv <- reg_fun_pfr_cv(Y, X_f_sel, X_s_sel)
+  print(paste0("RMSEP - ",mod_cv$RMSEP))
+}
+
+```
+
+
+```{r}
+
+summary(mod_current)
+names(X_f_sel)
+names(X_s_sel)
+
+```
+
+```{r}
+X_f_fin <- list(TEMP = X_f$TEMP, HYD = X_f$HYD)
+X_s_fin <- list()
+
+mod_fin <- reg_fun_pfr(Y, X_f = X_f_fin, X_s = X_s_fin)
+summary(mod_fin)
+#plot(mod_fin)
+
+
+
+
+basisobj <- create.bspline.basis(rangeval = c(11219, 11502), nbasis = 30) 
+fdParobj <- fdPar(basisobj, lambda = 1e-3)
+tgrid <- 11219:11502
+
+coef1 <- coef(mod_fin, select = 1)
+se1 <- sqrt(diag(vcov(mod_fin)))[1:length(coef1$value)]
+
+# Calculer l'intervalle de confiance à 95%
+ci1_low <- coef1$value - 1.96 * se1
+ci1_up  <- coef1$value + 1.96 * se1
+
+fdsmooth1 <- smooth.basis(
+  argvals  = seq(from = 11219, to = 11502, length.out = length(coef1[[1]])),
+  y        = coef1$value,  
+  fdParobj = fdParobj
+)
+fdsmooth1_low <- smooth.basis(
+  argvals  = seq(from = 11219, to = 11502, length.out = nrow(ci1_low)),
+  y        = ci1_low,
+  fdParobj = fdParobj
+)
+fdsmooth1_up <- smooth.basis(
+  argvals  = seq(from = 11219, to = 11502, length.out = nrow(ci1_up)),
+  y        = ci1_up,
+  fdParobj = fdParobj
+)
+
+beta_eval1 <- eval.fd(tgrid, fdsmooth1$fd)
+beta_eval1_low <- eval.fd(tgrid, fdsmooth1_low$fd)
+beta_eval1_up  <- eval.fd(tgrid, fdsmooth1_up$fd)
+
+# plot vide (crée le système de coordonnées)
+plot(tgrid, beta_eval1,
+     type = "n",
+     xaxt = "n",
+     xlab = "Dates de référence", 
+     ylab = "SY / Température",
+     main = "Signal d’association de la température")
+
+# limites verticales du plot
+yl <- par("usr")[3:4]
+
+cols <- adjustcolor(
+  c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+  alpha.f = 0.25)
+
+# rectangles EN PREMIER (fond)
+rect(ref_lm_v[-length(ref_lm_v)],
+     yl[1],
+     ref_lm_v[-1],
+     yl[2],
+     col = cols,
+     border = NA)
+
+pal <- colorRampPalette(c("blue", "grey80", "red"))
+ncol <- 100
+cols_curve <- pal(ncol)
+
+# limites symétriques autour de 0
+lim1 <- max(abs(beta_eval1), na.rm = TRUE)
+
+# normalisation centrée sur 0
+y_scaled1 <- cut(beta_eval1,
+                breaks = seq(-lim1, lim1, length.out = ncol + 1),
+                labels = FALSE,
+                include.lowest = TRUE)
+
+# courbe PAR-DESSUS
+for (i in 1:(length(tgrid) - 1)) {
+  segments(tgrid[i], beta_eval1[i],
+           tgrid[i + 1], beta_eval1[i + 1],
+           col = cols_curve[y_scaled1[i]],
+           lwd = 2)
+}
+
+points(tgrid, beta_eval1_low)
+polygon(c(tgrid, rev(tgrid)),
+        c(beta_eval1_low, rev(beta_eval1_up)),
+        col = rgb(0, 0, 1, 0.2),
+        border = NA)
+
+# axe x
+axis(1, at = ref_lm_v,
+     labels = format(as.Date(ref_lm_v), format = "%d-%m"),
+     las = 2)
+
+
+
+##################################
+
+
+coef2 <- coef(mod_fin, select = 2)
+
+fdsmooth2 <- smooth.basis(
+  argvals  = seq(from = 11219, to = 11502, length.out = length(coef2[[1]])),
+  y        = coef2$value,  
+  fdParobj = fdParobj
+)
+
+beta_eval2 <- eval.fd(tgrid, fdsmooth2$fd)
+
+# plot vide (crée le système de coordonnées)
+plot(tgrid, beta_eval2,
+     type = "n",
+     xaxt = "n",
+     xlab = "Dates de référence", 
+     ylab = "SY / WSC",
+     main = paste0("Signal d’association du WSC"))
+
+# limites verticales du plot
+yl <- par("usr")[3:4]
+
+# rectangles EN PREMIER (fond)
+rect(ref_lm_v[-length(ref_lm_v)],
+     yl[1],
+     ref_lm_v[-1],
+     yl[2],
+     col = cols,
+     border = NA)
+
+pal <- colorRampPalette(c("blue", "white", "red"))
+ncol <- 100
+cols_curve <- pal(ncol)
+
+# limites symétriques autour de 0
+lim2 <- max(abs(beta_eval2), na.rm = TRUE)
+
+# normalisation centrée sur 0
+y_scaled2 <- cut(beta_eval2,
+                breaks = seq(-lim2, lim2, length.out = ncol + 1),
+                labels = FALSE,
+                include.lowest = TRUE)
+
+for (i in 1:(length(tgrid) - 1)) {
+  segments(tgrid[i], beta_eval2[i],
+           tgrid[i + 1], beta_eval2[i + 1],
+           col = cols_curve[y_scaled2[i]],
+           lwd = 2)
+}
+
+axis(1, at = ref_lm_v,
+     labels = format(as.Date(ref_lm_v), format = "%d-%m"),
+     las = 2)
+
+
+
+```
+
+
+
+
+
+```{r reconstruction}
+
+fdsmooth1 <- smooth.basis(
+  argvals  = seq(from = 11219, to = 11502, length.out = length(coef1[[1]])),
+  y        = coef1$value,  
+  fdParobj = fdParobj
+)
+
+fdsmooth2 <- smooth.basis(
+  argvals  = seq(from = 11219, to = 11502, length.out = length(coef2[[1]])),
+  y        = coef2$value,  
+  fdParobj = fdParobj
+)
+
+
+
+X_f_s <- lapply(X_f, function(data_var) {
+    m <- mean(data_var)
+    s <- sd(data_var - m)
+    
+    data_var <- (data_var - m) / s
+    data_var <- as.matrix(data_var)})
+
+fdsmooth_temp <- smooth.basis(
+  argvals  = seq(from = 11219, to = 11502, length.out = length(X_f_s$TEMP[7, ])),
+  y        = X_f_s$TEMP[7, ],  
+  fdParobj = fdParobj
+)
+
+fdsmooth_WSC <- smooth.basis(
+  argvals  = seq(from = 11219, to = 11502, length.out = length(X_f_s$TEMP[7, ])),
+  y        = X_f_s$HYD[7, ],  
+  fdParobj = fdParobj
+)
+
+Y_hat <- -94 +
+  inprod(fdsmooth1$fd, fdsmooth_temp$fd) +
+  inprod(fdsmooth2$fd, fdsmooth_WSC$fd)
+
+
+Y_hat <- fitted(mod_fin)
+plot(Y-mean(Y), Y_hat)
+abline(0, 1, lty = 2, col = "grey40", lwd = 2)
+
+
+beta_eval2 <- eval.fd(tgrid, inprod(fdsmooth2$fd, fdsmooth_WSC$fd))
+
+ax1 <- X_f_s$TEMP[7, ] * eval.fd(tgrid, fdsmooth_temp$fd)
+ax2 <- X_f_s$HYD[7, ] * eval.fd(tgrid, fdsmooth_WSC$fd)
+
+#####################################################"
+plot(tgrid, ax1,
+     type = "l",
+     xaxt = "n",
+     xlab = "Dates de référence", 
+     ylab = "Rendement", 
+     main = "Impacte de la température sur le rendement pour SYN14")
+
+yl <- par("usr")[3:4]
+
+axis(1, at = ref_lm_v,
+     labels = format(as.Date(ref_lm_v), format = "%d-%m"),
+     las = 2)
+
+cols <- adjustcolor(
+  c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+  alpha.f = 0.25)
+
+rect(ref_lm_v[-length(ref_lm_v)],
+     yl[1],
+     ref_lm_v[-1],
+     yl[2],
+     col = cols,
+     border = NA)
+
+lim_ax1 <- max(abs(ax1), na.rm = TRUE)
+
+# normalisation centrée sur 0
+y_scaled_ax1 <- cut(ax1,
+                breaks = seq(-lim_ax1, lim_ax1, length.out = ncol + 1),
+                labels = FALSE,
+                include.lowest = TRUE)
+
+
+for (i in 1:(length(tgrid) - 1)) {
+  segments(tgrid[i], ax1[i],
+           tgrid[i + 1], ax1[i + 1],
+           col = cols_curve[y_scaled_ax1[i]],
+           lwd = 2)
+}
+
+
+
+####################################################
+plot(tgrid, ax2,
+     type = "n",
+     xaxt = "n",
+     xlab = "Dates de référence", 
+     ylab = "Rendement", 
+     main = "Impacte du WSC sur le rendement pour SYN14")
+
+yl <- par("usr")[3:4]
+
+axis(1, at = ref_lm_v,
+     labels = format(as.Date(ref_lm_v), format = "%d-%m"),
+     las = 2)
+
+cols <- adjustcolor(
+  c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+  alpha.f = 0.25)
+
+rect(ref_lm_v[-length(ref_lm_v)],
+     yl[1],
+     ref_lm_v[-1],
+     yl[2],
+     col = cols,
+     border = NA)
+
+lim_ax2 <- max(abs(ax2), na.rm = TRUE)
+
+# normalisation centrée sur 0
+y_scaled_ax2 <- cut(ax2,
+                breaks = seq(-lim_ax2, lim_ax2, length.out = ncol + 1),
+                labels = FALSE,
+                include.lowest = TRUE)
+
+
+for (i in 1:(length(tgrid) - 1)) {
+  segments(tgrid[i], ax2[i],
+           tgrid[i + 1], ax2[i + 1],
+           col = cols_curve[y_scaled_ax2[i]],
+           lwd = 2)
+}
+
+
+```
+
+
+
+```{r}
+
+coef1 <- coef(mod_fin, select = 1)
+
+fdsmooth1 <- smooth.basis(
+  argvals  = seq(11219, 11502, length.out = length(coef1$value)),
+  y        = coef1$value,
+  fdParobj = fdParobj
+)
+
+beta_eval1 <- eval.fd(tgrid, fdsmooth1$fd)
+
+Vb <- vcov(mod_fin)
+
+ind1 <- coef(mod_fin, select = 1)$ind
+Vb1  <- Vb[ind1, ind1]
+
+
+B <- eval.basis(tgrid, fdParobj$basis)
+se_beta <- sqrt(rowSums((B %*% Vb1) * B))
 
 
 
 
 
 
+colnames(pred$fit)
 
+term_name <- colnames(pred$fit)[1]
 
+beta_hat <- colMeans(pred$fit[, term_name, drop = FALSE])
+beta_se  <- sqrt(colMeans(pred$se.fit[, term_name, drop = FALSE]^2))
 
+beta_upper <- beta_hat + 1.96 * beta_se
+beta_lower <- beta_hat - 1.96 * beta_se
 
-
-
-
+plot(tgrid, beta_hat,
+     type = "n",
+     xaxt = "n",
+     xlab = "Dates de référence",
+     ylab = "SY / Température",
+     main = "Signal d’association de la température")
+```
 
 
 
@@ -354,10 +844,12 @@ reg_fun_pfr_cv <- function(Y, X_f = list(), X_s = data.frame(), Kx = 30, nfold =
   gain_pc <- round((MSEP_nul - MSEP)/MSEP_nul*100, 2)
   
   result <- list()
+  result$RMSEP_nul <- RMSEP_nul
   #Appel du gain avec $err_relative
   result$gain_pc <- gain_pc
   #Appel de la MSEP avec $MSEP
   result$MSEP <- round(MSEP, 2)
+  result$RMSEP <- round(RMSEP, 2)
   #Appel des résidus des régressions avec $model_fun_residus
   result$model_fun_residus <- Y - cvpred
   #Appel des prédictions avec $pred_fun_out
@@ -389,6 +881,15 @@ gain_1 <- c(
   X23 = res_X23$gain_pc,
   X123 = res_X123$gain_pc)
 
+RMSEP_1 <- c(
+  X1 = res_X1$RMSEP,
+  X2 = res_X2$RMSEP,
+  X3 = res_X2$RMSEP, 
+  X12 = res_X12$RMSEP,
+  X13 = res_X13$RMSEP,
+  X23 = res_X23$RMSEP,
+  X123 = res_X123$RMSEP)
+
 res_X0 <- reg_fun_pfr_cv(Y, X_f = list(), X_s = X_s)
 res_X1 <- reg_fun_pfr_cv(Y, X_f = list(X1 = X1), X_s = X_s)
 res_X2 <- reg_fun_pfr_cv(Y, X_f = list(X2 = X2), X_s = X_s)
@@ -413,6 +914,38 @@ gain_2 <- c(
 
 
 
+```{r}
+
+
+Y <- dta$value
+X0 <- as.matrix(rep(1, length(Y)))
+X1 <- as.matrix(dta[, 23:306])
+X2 <- as.matrix(dta[, 307:590])
+X3 <- as.matrix(dta[, 591:874])
+X_f <- list("TEMP" = X1, "HYD" = X2, "RAYO" = X3)
+
+corr_fun_Y <- cor(X3, Y, use = "complete.obs", method = "pearson")
+
+
+t <- c(11219, 11502)
+basisobj <- create.bspline.basis(rangeval = t, nbasis = 20) 
+fdParobj <- fdPar(basisobj, lambda = 1e-3)
+
+fdsmooth <- smooth.basis(
+  argvals  = t[1]:t[2],
+  y        = corr_fun_Y,  
+  fdParobj = fdParobj
+)
+
+corr_fun_eval <- eval.fd(t[1]:t[2], fdsmooth$fd)
+
+plot(t[1]:t[2], corr_fun_eval,
+     type = "l",
+     xlab = "Dates de référence", 
+     ylab = "corrélation entre RAYO et rendement ",
+     main = "corrélation entre RAYO et rendement en fonction du temps")
+
+```
 
 
 
@@ -538,17 +1071,17 @@ cvpred = matrix(0,nrow=nrow(dta),ncol=100)
 segments = cvsegments(nrow(dta),10) 
 #Pour chaque segment k:
 for (k in 1:10) {
-   trainx = x[-segments[[k]],]
-   trainy = y[-segments[[k]]]
-   testx = x[segments[[k]],]
-   #Calcul du MSEP pour chaque lambda sur les données train
-   cvmod = cv.glmnet(trainx,trainy,alpha=1,lambda=exp(loglambda))
-   #Ajustement de modèles pour les différent lambda
-   mod = glmnet(trainx,trainy,alpha=1,lambda=exp(loglambda))
-   #prédiction pour le lambda minimum sur l'échantillon test ie: celui du kième 
-   #segment
-   cvpred[segments[[k]],] = predict(mod,newx=testx)[,which.min(cvmod$cvm)] 
-   print(paste("Segment ",k,sep=""))
+  trainx = x[-segments[[k]],]
+  trainy = y[-segments[[k]]]
+  testx = x[segments[[k]],]
+  #Calcul du MSEP pour chaque lambda sur les données train
+  cvmod = cv.glmnet(trainx,trainy,alpha=1,lambda=exp(loglambda))
+  #Ajustement de modèles pour les différent lambda
+  mod = glmnet(trainx,trainy,alpha=1,lambda=exp(loglambda))
+  #prédiction pour le lambda minimum sur l'échantillon test ie: celui du kième 
+  #segment
+  cvpred[segments[[k]],] = predict(mod,newx=testx)[,which.min(cvmod$cvm)] 
+  print(paste("Segment ",k,sep=""))
 }
 #Calcul de MSEP
 MSEP = mean((dta$value-cvpred)^2)
@@ -601,13 +1134,13 @@ res_X123 <- reg_fun_pfr(Y, X_f = list(X1 = X1, X2 = X2, X3 = X3), X_s = X_s)
 
 
 gain_2 <- c(X0 = res_X0$gain_pc,
-  X1 = res_X1$gain_pc,
-  X2 = res_X2$gain_pc,
-  X3 = res_X2$gain_pc, 
-  X12 = res_X12$gain_pc,
-  X13 = res_X13$gain_pc,
-  X23 = res_X23$gain_pc,
-  X123 = res_X123$gain_pc)
+            X1 = res_X1$gain_pc,
+            X2 = res_X2$gain_pc,
+            X3 = res_X2$gain_pc, 
+            X12 = res_X12$gain_pc,
+            X13 = res_X13$gain_pc,
+            X23 = res_X23$gain_pc,
+            X123 = res_X123$gain_pc)
 
 summary(res_X123$model_fun_out)
 plot(res_X123$model_fun_out)
