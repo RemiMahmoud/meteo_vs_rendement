@@ -704,8 +704,10 @@ dt_meteo2  |>
 
 ```{r  plot dt_brute}
 
+# INRA13 SYN14 LIM15
+expi <- "LIM15"
+saison <- c("AUTOMNE", "HIVER", "MONTAISON", "FLORAISON", "P300-P1000")
 
-expi <- "SYN14"
 
 # png(paste0("image/bij/HYD_reel_", expi,".png"), width = 6, height = 4, units = "in", res = 300)
 
@@ -767,15 +769,12 @@ dt_var_bij <- dts_lm |>
 plot(dt_var_bij$date_ref_d, dt_var_bij$TEMP_T_Q,
      type = "l",
      xaxt = "n",
-     xlab = "Dates de référence", 
-     ylab = "Température",
-     main = paste0(expi, " - référentiel plante"))
+     xlab = "", 
+     ylab = "Température (°C)",
+     main = paste0(expi, " - référentiel plante"),
+     lwd = 2)
 
 yl <- par("usr")[3:4]
-
-axis(1, at = ref_lm_v,
-     labels = format(as.Date(ref_lm_v), format = "%d-%m"),
-     las = 2)
 
 cols <- adjustcolor(
   c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
@@ -793,6 +792,14 @@ bij <- make_bij_lm_ref(landmarks_s[[expi]], ref_lm)
 x_bij <- bij(x_ref)
 
 points(x_bij, rep(50, length(x_bij)))
+
+x_centers <- (ref_lm_v[-length(ref_lm_v)] + ref_lm_v[-1]) / 2  # centre des rectangles
+y_label <- yl[1] - 0.1 * diff(yl) * c(0.5, 1)   # un peu en dessous
+text(x = x_centers[1:length(saison)], 
+     y = y_label, 
+     labels = saison, 
+     cex = 0.9, 
+     xpd = TRUE)
 
 
 dev.off()

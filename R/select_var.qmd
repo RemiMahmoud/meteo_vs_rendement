@@ -1,0 +1,14 @@
+---
+title: "select_var"
+format: html
+---
+
+```{r}
+
+
+
+
+
+
+```
+

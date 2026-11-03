@@ -304,8 +304,8 @@ for (i in seq_len(5)) {
 }
 
 
-png(filename = paste0("image/reg_fun/sing_asso_TEMP_norm.png"), 
-    width = 1800, height = 900, res = 180)
+# png(filename = paste0("image/reg_fun/sing_asso_TEMP_norm.png"), 
+#     width = 1800, height = 900, res = 180)
 
 ylim <- par("usr")[3:4]
 num <- c("Première", "Deuxième", "Troisième", "Quatrième", "Cinquième")
@@ -338,7 +338,7 @@ text(x = x_centers[1:length(saison)],
      labels = saison, 
      cex = 0.9, 
      xpd = TRUE)
-dev.off()
+#dev.off()
 
 ```
 

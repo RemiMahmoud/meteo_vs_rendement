@@ -374,6 +374,13 @@ names(X_s_sel)
 ```
 
 ```{r}
+Y <- dta$value
+X1 <- as.matrix(dta[, 23:306])
+X2 <- as.matrix(dta[, 307:590])
+X3 <- as.matrix(dta[, 591:874])
+X_f <- list("TEMP" = X1, "HYD" = X2, "RAYO" = X3)
+rm(X1, X2, X3)
+X_s = as.data.frame(dta[, c(6:20, 22)])
 X_f_fin <- list(TEMP = X_f$TEMP, HYD = X_f$HYD)
 X_s_fin <- list()
 
@@ -382,6 +389,7 @@ summary(mod_fin)
 #plot(mod_fin)
 
 
+saison <- c("AUTOMNE", "HIVER", "MONTAISON", "FLORAISON", "P300-P1000")
 
 
 basisobj <- create.bspline.basis(rangeval = c(11219, 11502), nbasis = 30) 
@@ -389,11 +397,10 @@ fdParobj <- fdPar(basisobj, lambda = 1e-3)
 tgrid <- 11219:11502
 
 coef1 <- coef(mod_fin, select = 1)
-se1 <- sqrt(diag(vcov(mod_fin)))[1:length(coef1$value)]
 
 # Calculer l'intervalle de confiance à 95%
-ci1_low <- coef1$value - 1.96 * se1
-ci1_up  <- coef1$value + 1.96 * se1
+ci1_low <- coef1$value - 1.96 * coef1$se
+ci1_up  <- coef1$value + 1.96 * coef1$se
 
 fdsmooth1 <- smooth.basis(
   argvals  = seq(from = 11219, to = 11502, length.out = length(coef1[[1]])),
@@ -415,12 +422,14 @@ beta_eval1 <- eval.fd(tgrid, fdsmooth1$fd)
 beta_eval1_low <- eval.fd(tgrid, fdsmooth1_low$fd)
 beta_eval1_up  <- eval.fd(tgrid, fdsmooth1_up$fd)
 
+# png("image/reg_fun/sign_asso_temp.png", width = 8, height = 6, units = "in", res = 300)
+
 # plot vide (crée le système de coordonnées)
 plot(tgrid, beta_eval1,
      type = "n",
      xaxt = "n",
-     xlab = "Dates de référence", 
-     ylab = "SY / Température",
+     xlab = "", 
+     ylab = expression(q %.% h^{-1} %.% degree*C^{-1}),
      main = "Signal d’association de la température")
 
 # limites verticales du plot
@@ -438,7 +447,7 @@ rect(ref_lm_v[-length(ref_lm_v)],
      col = cols,
      border = NA)
 
-pal <- colorRampPalette(c("blue", "grey80", "red"))
+pal <- colorRampPalette(c("blue", "white", "red"))
 ncol <- 100
 cols_curve <- pal(ncol)
 
@@ -447,54 +456,81 @@ lim1 <- max(abs(beta_eval1), na.rm = TRUE)
 
 # normalisation centrée sur 0
 y_scaled1 <- cut(beta_eval1,
-                breaks = seq(-lim1, lim1, length.out = ncol + 1),
-                labels = FALSE,
-                include.lowest = TRUE)
+                 breaks = seq(-lim1, lim1, length.out = ncol + 1),
+                 labels = FALSE,
+                 include.lowest = TRUE)
 
 # courbe PAR-DESSUS
 for (i in 1:(length(tgrid) - 1)) {
   segments(tgrid[i], beta_eval1[i],
            tgrid[i + 1], beta_eval1[i + 1],
            col = cols_curve[y_scaled1[i]],
-           lwd = 2)
+           lwd = 4)
 }
 
-points(tgrid, beta_eval1_low)
-polygon(c(tgrid, rev(tgrid)),
-        c(beta_eval1_low, rev(beta_eval1_up)),
-        col = rgb(0, 0, 1, 0.2),
-        border = NA)
+lines(tgrid, numeric(length(tgrid)), lty = 1, col = "black")
 
-# axe x
-axis(1, at = ref_lm_v,
-     labels = format(as.Date(ref_lm_v), format = "%d-%m"),
-     las = 2)
+yl <- par("usr")[3:4]
 
+x_centers <- (ref_lm_v[-length(ref_lm_v)] + ref_lm_v[-1]) / 2  # centre des rectangles
+y_label <- yl[1] - 0.1 * diff(yl) * c(0.5, 1)   # un peu en dessous
+text(x = x_centers[1:length(saison)], 
+     y = y_label, 
+     labels = saison, 
+     cex = 1.3, 
+     xpd = TRUE)
 
+lines(tgrid, beta_eval1_low, lty = 2, col = "grey40", lwd = 2)
+lines(tgrid, beta_eval1_up, lty = 2, col = "grey40", lwd = 2)
 
-##################################
+# dev.off()
 
+```
+
+```{r}
 
 coef2 <- coef(mod_fin, select = 2)
+
+# Calculer l'intervalle de confiance à 95%
+ci2_low <- coef2$value - 1.96 * coef2$se
+ci2_up  <- coef2$value + 1.96 * coef2$se
 
 fdsmooth2 <- smooth.basis(
   argvals  = seq(from = 11219, to = 11502, length.out = length(coef2[[1]])),
   y        = coef2$value,  
   fdParobj = fdParobj
 )
+fdsmooth2_low <- smooth.basis(
+  argvals  = seq(from = 11219, to = 11502, length.out = nrow(ci2_low)),
+  y        = ci2_low,
+  fdParobj = fdParobj
+)
+fdsmooth2_up <- smooth.basis(
+  argvals  = seq(from = 11219, to = 11502, length.out = nrow(ci2_up)),
+  y        = ci2_up,
+  fdParobj = fdParobj
+)
 
 beta_eval2 <- eval.fd(tgrid, fdsmooth2$fd)
+beta_eval2_low <- eval.fd(tgrid, fdsmooth2_low$fd)
+beta_eval2_up  <- eval.fd(tgrid, fdsmooth2_up$fd)
+
+# png("image/reg_fun/sign_asso_wsc.png", width = 8, height = 6, units = "in", res = 300)
 
 # plot vide (crée le système de coordonnées)
 plot(tgrid, beta_eval2,
      type = "n",
      xaxt = "n",
-     xlab = "Dates de référence", 
-     ylab = "SY / WSC",
+     xlab = "", 
+     ylab = expression(q %.% h^{-1} %.% mm^{-1}),
      main = paste0("Signal d’association du WSC"))
 
 # limites verticales du plot
 yl <- par("usr")[3:4]
+
+cols <- adjustcolor(
+  c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
+  alpha.f = 0.25)
 
 # rectangles EN PREMIER (fond)
 rect(ref_lm_v[-length(ref_lm_v)],
@@ -513,25 +549,36 @@ lim2 <- max(abs(beta_eval2), na.rm = TRUE)
 
 # normalisation centrée sur 0
 y_scaled2 <- cut(beta_eval2,
-                breaks = seq(-lim2, lim2, length.out = ncol + 1),
-                labels = FALSE,
-                include.lowest = TRUE)
+                 breaks = seq(-lim2, lim2, length.out = ncol + 1),
+                 labels = FALSE,
+                 include.lowest = TRUE)
 
+# courbe PAR-DESSUS
 for (i in 1:(length(tgrid) - 1)) {
   segments(tgrid[i], beta_eval2[i],
            tgrid[i + 1], beta_eval2[i + 1],
            col = cols_curve[y_scaled2[i]],
-           lwd = 2)
+           lwd = 4)
 }
 
-axis(1, at = ref_lm_v,
-     labels = format(as.Date(ref_lm_v), format = "%d-%m"),
-     las = 2)
+lines(tgrid, numeric(length(tgrid)), lty = 1, col = "black")
 
+yl <- par("usr")[3:4]
 
+x_centers <- (ref_lm_v[-length(ref_lm_v)] + ref_lm_v[-1]) / 2  # centre des rectangles
+y_label <- yl[1] - 0.1 * diff(yl) * c(0.5, 1)   # un peu en dessous
+text(x = x_centers[1:length(saison)], 
+     y = y_label, 
+     labels = saison, 
+     cex = 1.3, 
+     xpd = TRUE)
+
+lines(tgrid, beta_eval2_low, lty = 2, col = "grey40", lwd = 2)
+lines(tgrid, beta_eval2_up, lty = 2, col = "grey40", lwd = 2)
+
+# dev.off()
 
 ```
-
 
 
 
@@ -550,24 +597,24 @@ fdsmooth2 <- smooth.basis(
   fdParobj = fdParobj
 )
 
-
+expi = 11
 
 X_f_s <- lapply(X_f, function(data_var) {
-    m <- mean(data_var)
-    s <- sd(data_var - m)
-    
-    data_var <- (data_var - m) / s
-    data_var <- as.matrix(data_var)})
+  m <- mean(data_var)
+  s <- sd(data_var - m)
+  
+  data_var <- (data_var - m) / s
+  data_var <- as.matrix(data_var)})
 
 fdsmooth_temp <- smooth.basis(
-  argvals  = seq(from = 11219, to = 11502, length.out = length(X_f_s$TEMP[7, ])),
-  y        = X_f_s$TEMP[7, ],  
+  argvals  = seq(from = 11219, to = 11502, length.out = length(X_f_s$TEMP[expi, ])),
+  y        = X_f_s$TEMP[expi, ],  
   fdParobj = fdParobj
 )
 
 fdsmooth_WSC <- smooth.basis(
-  argvals  = seq(from = 11219, to = 11502, length.out = length(X_f_s$TEMP[7, ])),
-  y        = X_f_s$HYD[7, ],  
+  argvals  = seq(from = 11219, to = 11502, length.out = length(X_f_s$TEMP[expi, ])),
+  y        = X_f_s$HYD[expi, ],  
   fdParobj = fdParobj
 )
 
@@ -581,24 +628,24 @@ plot(Y-mean(Y), Y_hat)
 abline(0, 1, lty = 2, col = "grey40", lwd = 2)
 
 
-beta_eval2 <- eval.fd(tgrid, inprod(fdsmooth2$fd, fdsmooth_WSC$fd))
+ax1 <- X_f_s$TEMP[expi, ] * eval.fd(tgrid, fdsmooth_temp$fd)
+ax2 <- X_f_s$HYD[expi, ] * eval.fd(tgrid, fdsmooth_WSC$fd)
 
-ax1 <- X_f_s$TEMP[7, ] * eval.fd(tgrid, fdsmooth_temp$fd)
-ax2 <- X_f_s$HYD[7, ] * eval.fd(tgrid, fdsmooth_WSC$fd)
+#####################################################
 
-#####################################################"
+png("image/reg_fun/impact_temp_syn14.png", width = 8, height = 6, units = "in", res = 300)
+
+
 plot(tgrid, ax1,
-     type = "l",
+     type = "n",
      xaxt = "n",
-     xlab = "Dates de référence", 
-     ylab = "Rendement", 
-     main = "Impacte de la température sur le rendement pour SYN14")
+     xlab = "", 
+     ylab = expression(q %.% h^{-1}), 
+     main = "Impact de la température sur le rendement pour SYN14")
 
 yl <- par("usr")[3:4]
 
-axis(1, at = ref_lm_v,
-     labels = format(as.Date(ref_lm_v), format = "%d-%m"),
-     las = 2)
+
 
 cols <- adjustcolor(
   c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
@@ -615,9 +662,9 @@ lim_ax1 <- max(abs(ax1), na.rm = TRUE)
 
 # normalisation centrée sur 0
 y_scaled_ax1 <- cut(ax1,
-                breaks = seq(-lim_ax1, lim_ax1, length.out = ncol + 1),
-                labels = FALSE,
-                include.lowest = TRUE)
+                    breaks = seq(-lim_ax1, lim_ax1, length.out = ncol + 1),
+                    labels = FALSE,
+                    include.lowest = TRUE)
 
 
 for (i in 1:(length(tgrid) - 1)) {
@@ -627,13 +674,22 @@ for (i in 1:(length(tgrid) - 1)) {
            lwd = 2)
 }
 
+x_centers <- (ref_lm_v[-length(ref_lm_v)] + ref_lm_v[-1]) / 2  # centre des rectangles
+y_label <- yl[1] - 0.1 * diff(yl) * c(0.5, 1)   # un peu en dessous
+text(x = x_centers[1:length(saison)], 
+     y = y_label, 
+     labels = saison, 
+     cex = 1.3, 
+     xpd = TRUE)
+
+dev.off()
 
 
 ####################################################
 plot(tgrid, ax2,
      type = "n",
      xaxt = "n",
-     xlab = "Dates de référence", 
+     xlab = "", 
      ylab = "Rendement", 
      main = "Impacte du WSC sur le rendement pour SYN14")
 
@@ -658,9 +714,9 @@ lim_ax2 <- max(abs(ax2), na.rm = TRUE)
 
 # normalisation centrée sur 0
 y_scaled_ax2 <- cut(ax2,
-                breaks = seq(-lim_ax2, lim_ax2, length.out = ncol + 1),
-                labels = FALSE,
-                include.lowest = TRUE)
+                    breaks = seq(-lim_ax2, lim_ax2, length.out = ncol + 1),
+                    labels = FALSE,
+                    include.lowest = TRUE)
 
 
 for (i in 1:(length(tgrid) - 1)) {

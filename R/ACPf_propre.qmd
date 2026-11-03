@@ -112,8 +112,8 @@ plot_harmonique <- function(acpf, i, variable){
   plot(acpf$harmonics[i],
        main = paste(num[i], "composante principale fonctionnelle de ", variable),
        xlab = "",
-       xaxt = "n",
-       ylab = paste("Valeur de la", num[i], "composante principale"))
+       ylab = "",
+       xaxt = "n")
   
   cols <- adjustcolor(
     c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#F15854"),
@@ -126,10 +126,10 @@ plot_harmonique <- function(acpf, i, variable){
        col = cols,
        border = NA)
   
-  y_text <- ylim[1] + 0.05 * diff(ylim)
+  yl <- par("usr")[3:4]
   
   x_centers <- (ref_lm_v[-length(ref_lm_v)] + ref_lm_v[-1]) / 2  # centre des rectangles
-  y_label <- ylim[1] - 0.3 * (ylim - ylim[1])                     # un peu en dessous
+  y_label <- yl[1] - 0.1 * diff(yl) * c(0.5, 1)   # un peu en dessous
   text(x = x_centers[1:length(saison)], 
        y = y_label, 
        labels = saison, 
@@ -215,7 +215,7 @@ plot_indiv <- function(acpf, type_rend, var, axe, variable){
   }
 }
 
-fdobj <- data_acp_f(TEMP_T_Q, centre = F, plot = T)
+fdobj <- data_acp_f(E.HYD_WSC, centre = F, plot = T)
 acpf <- pca.fd(fdobj, nharm = 5) 
 plot_indiv(acpf,type_rend = "SY", var = "Montego", axe = c(1, 2), "E.HYD_WSC" )
 
@@ -262,10 +262,13 @@ fun_acpf_plot <- function(variable,
   
 }
 
+fun_acpf_plot("E.HYD_WSC", nbspines = 15, axe = c(1, 3), type_rend = "SY")
 fun_acpf_plot("TEMP_T_Q", nbspines = 10, axe = c(1, 3), type_rend = "SY")
+fun_acpf_plot("RAYO_SSI_Q", nbspines = 20, axe = c(1, 3), type_rend = "SY")
 
 
 ```
+
 
 
 ```{r plot_fdobj_experience}
@@ -276,16 +279,17 @@ plot_fdobj_experience <- function(fdobj, experience){
   fd_subset <- fdobj[experience]
   
   n <- length(experience)
-  cols <- c("red", "black", "blue")
+  cols <- c("#d18975", "#8fd175", "#75b8d1")
   
   par(mar = c(5, 4, 4, 8))
   
   plot(fd_subset,
        col = cols, 
        lty = 1, 
+       lwd = 3,
        xlab = "", 
-       ylab = "Moyenne des températures",
-       main = "Courbes fonctionnelles estimées", 
+       ylab = "WSC (mm)",
+       main = "Courbes alignées et lissées", 
        xaxt = "n")
   
   colours <- adjustcolor(
@@ -301,6 +305,11 @@ plot_fdobj_experience <- function(fdobj, experience){
        col = colours,
        border = NA)
   
+  lines(fd_subset,
+        col = cols,
+        lty = 1,
+        lwd = 3)
+  
   y_text <- yl + 0.05 * diff(yl)
   
   x_centers <- (ref_lm_v[-length(ref_lm_v)] + ref_lm_v[-1]) / 2  # centre des rectangles
@@ -308,7 +317,7 @@ plot_fdobj_experience <- function(fdobj, experience){
   text(x = x_centers[1:length(saison)], 
        y = y_label, 
        labels = saison, 
-       cex = 0.9, 
+       cex = 1.3, 
        xpd = TRUE)
   
   legend("topright", 
@@ -318,12 +327,11 @@ plot_fdobj_experience <- function(fdobj, experience){
          cex = 1,
          bty = "n",
          xpd = TRUE,
-         inset = c(-0.2, 0), 
+         inset = c(0, 0), 
          seg.len = 1.5)
-  
 }
 
-plot_fdobj_experience(fdobj, c("INRA13", "SYN14", "LIM15")) 
+plot_fdobj_experience(fdobj, c("INRA13", "LIM15", "SYN14")) 
 ```
 
 
@@ -334,11 +342,11 @@ plot_fdobj_experience(fdobj, c("INRA13", "SYN14", "LIM15"))
 plot_courbe <- function(variable, brute = F, normaliser = F, experience = NULL, centre = F, plot = T, nbspines = 30){
   
   if(variable == "TEMP_T_Q"){
-    ylab <- "Température moyenne quotidienne"
+    ylab <- "Température (°C)"
   } else if (variable == "RAYO_SSI_Q"){
-    ylab <- "Rayonnement solaire quotidien"
+    ylab <- "Rayonnement (J.cm-2)"
   } else if (variable == "E.HYD_WSC"){
-    ylab <- "Water Soil Content"
+    ylab <- "WSC (mm)"
   }
   
   if(normaliser){
@@ -402,7 +410,7 @@ plot_courbe <- function(variable, brute = F, normaliser = F, experience = NULL, 
     if(is.null(experience)){experience <- unique(dta$exp)}
     
     for(expi in experience){
-      # png(filename = paste0("image/", variable, "_", expi, "_brute.png"), 
+      # png(filename = paste0("image/", variable, "_", expi, "_brute.png"),
       # width = 1800, height = 900, res = 180)
       
       dta_i <- dta |> 
@@ -439,15 +447,18 @@ plot_courbe <- function(variable, brute = F, normaliser = F, experience = NULL, 
         if(brute){
           plot(time, data_var,  ##################  fdobj
                lty = 1, 
+               lwd = 3,
                type = "l",
                xlab = "", 
                ylab = ylab,
-               main = paste("Courbes fonctionnelles estimées :", expi), 
+               main = paste("Courbes du rayonnement :", expi), 
                xaxt = "n"
           )
+          
         } else {
           plot(fdobj,
                lty = 1, 
+               lwd = 3,
                xlab = "", 
                ylab = ylab,
                main = paste("Courbes fonctionnelles estimées :", expi), 
@@ -490,7 +501,7 @@ plot_courbe <- function(variable, brute = F, normaliser = F, experience = NULL, 
         text(x = x_centers[1:length(saison)], 
              y = y_label, 
              labels = saison, 
-             cex = 0.9, 
+             cex = 1.3, 
              xpd = TRUE)
         
         
@@ -503,7 +514,7 @@ plot_courbe <- function(variable, brute = F, normaliser = F, experience = NULL, 
   
 }
 
-plot_courbe("E.HYD_WSC", brute = T)
+plot_courbe("RAYO_SSI_Q", brute = T)
 
 ```
 
